@@ -7,6 +7,7 @@ site:
   tilt: 31
   azimuth: 180
 
+array:
   n_panels: 12
   series_per_string: 6
   strings_per_mppt: 2
@@ -33,10 +34,16 @@ losses:
 inverter:
   p_rated_kw: 4.0
 
+blynk:
+  token: ""
+  server: "https://blynk.cloud"
+  virtual_pins:
+    temperature: "V0"
+    irradiance: "V1"
+
 ems:
   mqtt_broker: "localhost"
   mqtt_port: 1883
   mqtt_topic_telemetry: "esp32/telemetry"
   mqtt_topic_command: "esp32/command"
-  blynk_api_key: ""
   open_meteo_interval_min: 15
