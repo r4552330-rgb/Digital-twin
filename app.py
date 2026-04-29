@@ -1,3 +1,4 @@
+# app.py — Dashboard Streamlit du Jumeau Numérique PV
 import math
 from pathlib import Path
 from datetime import datetime
@@ -6,37 +7,68 @@ import streamlit as st
 import yaml
 import plotly.graph_objects as go
 
-from model import PVModel
-from data import DataFetcher
+from model import PVModel          # Votre modèle physique
+from data import DataFetcher       # Votre classe de récupération de données
 
-# ── CONFIG ─────────────────────────────────────────────────────────────────
+# ── CHARGEMENT CONFIGURATION (avec vérification) ───────────────────────────
 config_path = Path(__file__).parent / "config.yaml"
-with open(config_path) as f:
+if not config_path.exists():
+    st.error("Fichier config.yaml introuvable.")
+    st.stop()
+
+with open(config_path, encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
+# Vérification rapide des sections attendues
+for section in ("site", "panel", "losses"):
+    if section not in config:
+        st.error(f"Section '{section}' manquante dans config.yaml.")
+        st.stop()
+# Vérification plus fine
+if "n_panels" not in config["site"] or "pmp_stc" not in config["panel"]:
+    st.error("Clés obligatoires absentes (site.n_panels ou panel.pmp_stc).")
+    st.stop()
+
+# ── INITIALISATION ─────────────────────────────────────────────────────────
 pv      = PVModel(config)
 fetcher = DataFetcher(config)
 
 st.set_page_config(
     page_title="PV Digital Twin",
-    page_icon=":sun:",
+    page_icon=":sun:",                  # symbole texte (pas d'emoji graphique)
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ── SESSION STATE ──────────────────────────────────────────────────────────
-if "page"   not in st.session_state: st.session_state.page   = "Vue d'ensemble"
-if "period" not in st.session_state: st.session_state.period = "Jour"
+if "page" not in st.session_state:
+    st.session_state.page = "Vue d'ensemble"
+if "period" not in st.session_state:
+    st.session_state.period = "Jour"
 
-# ── CSS ────────────────────────────────────────────────────────────────────
+# ── CSS PERSONNALISÉ ───────────────────────────────────────────────────────
 st.markdown("""
 <style>
-[data-testid="stSidebar"] { background:#0f172a !important; border-right:1px solid #1e293b; }
-[data-testid="stSidebar"] * { color:#94a3b8 !important; }
-.main .block-container { padding:0 !important; max-width:100% !important; }
-#MainMenu, footer, header { visibility:hidden; }
-.stDeployButton { display:none; }
-div[data-testid="stHorizontalBlock"] { gap:0 !important; }
+[data-testid="stSidebar"] {
+    background: #0f172a !important;
+    border-right: 1px solid #1e293b;
+}
+[data-testid="stSidebar"] * {
+    color: #94a3b8 !important;
+}
+.main .block-container {
+    padding: 0 !important;
+    max-width: 100% !important;
+}
+#MainMenu, footer, header {
+    visibility: hidden;
+}
+.stDeployButton {
+    display: none;
+}
+div[data-testid="stHorizontalBlock"] {
+    gap: 0 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -56,64 +88,83 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    # Navigation
     nav_items = [
-        ("Accueil",   "Vue d'ensemble", False),
-        ("Jumeau",    "Jumeau numérique", False),
-        ("Perf.",     "Performance", False),
-        ("Equip.",    "Equipements", False),
-        ("Alarmes",   "Alarmes", True),
-        ("Analyses",  "Analyses", False),
-        ("Rapports",  "Rapports", False),
-        ("Meteo",     "Meteo", False),
-        ("Param.",    "Parametres", False),
+        ("Accueil",   "Vue d'ensemble"),
+        ("Jumeau",    "Jumeau numerique"),
+        ("Perf.",     "Performance"),
+        ("Equip.",    "Equipements"),
+        ("Alarmes",   "Alarmes (2)"),
+        ("Analyses",  "Analyses"),
+        ("Rapports",  "Rapports"),
+        ("Meteo",     "Meteo"),
+        ("Param.",    "Parametres"),
     ]
-    for label, name, has_badge in nav_items:
-        button_label = f"{label}  [2]" if has_badge else label
-        if st.button(button_label, key=f"nav_{name}", use_container_width=True):
+    for label, name in nav_items:
+        if st.button(label, key=f"nav_{name}", use_container_width=True):
             st.session_state.page = name
 
-    st.markdown("""<div style='margin-top:1.5rem;padding-top:1rem;border-top:1px solid #1e293b;'>
+    # Carte site
+    st.markdown("""
+    <div style='margin-top:1.5rem;padding-top:1rem;border-top:1px solid #1e293b;'>
         <div style='color:#475569!important;font-size:10px;text-transform:uppercase;
                     letter-spacing:.1em;padding:0 0.5rem;margin-bottom:0.4rem;'>SITE</div>
-    </div>""", unsafe_allow_html=True)
-
+    </div>
+    """, unsafe_allow_html=True)
     st.selectbox("", [config["site"]["name"]], label_visibility="collapsed")
-    cap_dc = config["site"]["n_panels"] * config["panel"]["pmp_stc"] / 1000
+
+    # Capacité DC (en kWp)
+    cap_dc_kw = config["site"]["n_panels"] * config["panel"]["pmp_stc"] / 1000.0   # kW
     st.markdown(f"""
     <div style='padding:0.3rem 0.5rem;'>
         <div style='color:#475569!important;font-size:10px;'>Capacite DC</div>
-        <div style='color:#94a3b8!important;font-size:13px;font-weight:600;'>{cap_dc:.2f} MWp</div>
-    </div>""", unsafe_allow_html=True)
+        <div style='color:#94a3b8!important;font-size:13px;font-weight:600;'>{cap_dc_kw:.2f} kWp</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# ── DATA ───────────────────────────────────────────────────────────────────
-data = fetcher.get_data()
-res  = pv.compute(data["irradiance"], data["temperature"])
-now  = datetime.now()
+# ── RÉCUPÉRATION DES DONNÉES ───────────────────────────────────────────────
+try:
+    data = fetcher.get_data()
+except Exception as e:
+    st.warning(f"Erreur de récupération des données : {e}")
+    data = {"irradiance": 0.0, "temperature": 25.0}
 
-hours     = list(range(25))
-p_ac_curve = [
-    pv.compute(900 * math.sin(math.pi * (h-6) / 12) if 6 <= h <= 18 else 0.0, 25)["p_ac_kw"]
-    for h in hours
-]
-irr_curve = [max(0.0, 950 * math.sin(math.pi * (h-6) / 12)) if 6 <= h <= 18 else 0.0 for h in hours]
+res = pv.compute(data["irradiance"], data["temperature"])
+now = datetime.now()
 
-prod_jour  = round(sum(p_ac_curve) / 1000, 2)
-co2_evite  = round(res["p_ac_kw"] * 0.7, 0)
-rend_spec  = round(prod_jour * 1000 / (cap_dc * 1000), 2)
+# ── COURBE DE PRODUCTION SIMULÉE (journée type) ────────────────────────────
+hours = list(range(25))
+p_ac_curve = []
+irr_curve = []
+for h in hours:
+    # Irradiance sinusoïdale entre 6h et 18h
+    if 6 <= h <= 18:
+        irr = 900 * math.sin(math.pi * (h - 6) / 12)
+    else:
+        irr = 0.0
+    irr_curve.append(max(0.0, irr))
+    sim_res = pv.compute(irr, 25.0)
+    p_ac_curve.append(sim_res["p_ac_kw"])
 
+prod_jour_kwh = round(sum(p_ac_curve), 2)                # kWh (somme des puissances horaires)
+co2_evite_kg  = round(res["p_ac_kw"] * 0.7, 0)          # kg (facteur 0.7 kg/kWh)
+rend_spec     = round((prod_jour_kwh / (cap_dc_kw * 1.0)) if cap_dc_kw > 0 else 0, 2) # kWh/kWp
+
+# Météo simplifiée
 meteo_label = "Ensoleille" if data["irradiance"] > 600 else ("Nuageux" if data["irradiance"] > 200 else "Couvert")
-meteo_symbol = "Soleil" if data["irradiance"] > 600 else ("Nuage" if data["irradiance"] > 200 else "Pluie")
+meteo_symbol = "[Soleil]" if data["irradiance"] > 600 else ("[Nuage]" if data["irradiance"] > 200 else "[Pluie]")
 
 # Puissance nominale AC estimée
-p_rated_ac_kw = config["site"]["n_panels"] * config["panel"]["pmp_stc"] / 1000 * config["losses"]["ac_efficiency"]
+p_rated_ac_kw = cap_dc_kw * config["losses"]["ac_efficiency"]   # kW
 
 # ── BANDEAU HEADER ─────────────────────────────────────────────────────────
 st.markdown(f"""
 <div style='background:#0f172a;padding:.9rem 2rem;display:flex;align-items:center;
             border-bottom:1px solid #1e293b;flex-wrap:wrap;gap:.5rem;'>
+    <!-- Météo -->
     <div style='display:flex;align-items:center;gap:12px;padding-right:2rem;
                 border-right:1px solid #1e293b;margin-right:2rem;min-width:200px;'>
-        <div style='font-size:34px;line-height:1;'>[{meteo_symbol}]</div>
+        <div style='font-size:34px;line-height:1;'>{meteo_symbol}</div>
         <div>
             <div style='color:#f1f5f9;font-weight:600;font-size:14px;'>{meteo_label}</div>
             <div style='color:#f59e0b;font-size:24px;font-weight:700;line-height:1.1;'>
@@ -121,36 +172,35 @@ st.markdown(f"""
             <div style='color:#64748b;font-size:10px;'>Irradiance {data["irradiance"]:.0f} W/m²</div>
         </div>
     </div>
+    <!-- Puissance AC instantanée -->
     <div style='padding:0 2rem;border-right:1px solid #1e293b;margin-right:2rem;'>
         <div style='color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.06em;'>Puissance AC</div>
-        <div style='color:#4ade80;font-size:26px;font-weight:700;line-height:1.1;'>{res["p_ac_kw"]}</div>
-        <div style='color:#94a3b8;font-size:10px;'>{res["p_ac_kw"]/p_rated_ac_kw*100:.0f}% de la capacite</div>
+        <div style='color:#4ade80;font-size:26px;font-weight:700;line-height:1.1;'>{res["p_ac_kw"]:.2f} kW</div>
+        <div style='color:#94a3b8;font-size:10px;'>
+            {res["p_ac_kw"]/p_rated_ac_kw*100:.0f}% de la capacite</div>
     </div>
+    <!-- Production du jour -->
     <div style='padding:0 2rem;border-right:1px solid #1e293b;margin-right:2rem;'>
-        <div style='color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.06em;'>Production du jour</div>
-        <div style='color:#f1f5f9;font-size:26px;font-weight:700;line-height:1.1;'>{prod_jour}</div>
+        <div style='color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.06em;'>Production jour</div>
+        <div style='color:#f1f5f9;font-size:26px;font-weight:700;line-height:1.1;'>{prod_jour_kwh:.1f}</div>
+        <div style='color:#94a3b8;font-size:10px;'>kWh</div>
+    </div>
+    <!-- Production totale (fictive) -->
+    <div style='padding:0 2rem;border-right:1px solid #1e293b;margin-right:2rem;'>
+        <div style='color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.06em;'>Prod. totale</div>
+        <div style='color:#f1f5f9;font-size:26px;font-weight:700;line-height:1.1;'>{res["p_ac_kw"]*1.25:.2f}</div>
         <div style='color:#94a3b8;font-size:10px;'>MWh</div>
     </div>
-    <div style='padding:0 2rem;border-right:1px solid #1e293b;margin-right:2rem;'>
-        <div style='color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.06em;'>Production totale</div>
-        <div style='color:#f1f5f9;font-size:26px;font-weight:700;line-height:1.1;'>{res["p_ac_kw"]*1.25:.2f}</div>
-        <div style='color:#94a3b8;font-size:10px;'>GWh</div>
-    </div>
+    <!-- CO2 évité -->
     <div style='padding:0 2rem;border-right:1px solid #1e293b;margin-right:2rem;'>
         <div style='color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:.06em;'>CO2 evite</div>
-        <div style='color:#f1f5f9;font-size:26px;font-weight:700;line-height:1.1;'>{co2_evite:.0f}</div>
-        <div style='color:#94a3b8;font-size:10px;'>t</div>
+        <div style='color:#f1f5f9;font-size:26px;font-weight:700;line-height:1.1;'>{co2_evite_kg:.0f}</div>
+        <div style='color:#94a3b8;font-size:10px;'>kg</div>
     </div>
+    <!-- Horodatage -->
     <div style='margin-left:auto;text-align:right;'>
         <div style='color:#94a3b8;font-size:12px;'>{now.strftime("%d %b %Y")}</div>
         <div style='color:#f59e0b;font-size:20px;font-weight:700;font-family:monospace;'>{now.strftime("%H:%M:%S")}</div>
-        <div style='margin-top:6px;'>
-            <select style='background:#1e293b;color:#94a3b8;border:1px solid #334155;
-                           border-radius:6px;padding:2px 8px;font-size:11px;'>
-                <option>Periode</option><option selected>Aujourd'hui</option>
-                <option>Semaine</option><option>Mois</option>
-            </select>
-        </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -160,7 +210,7 @@ col_left, col_right = st.columns([3, 2], gap="small")
 
 # ═══════════════════════ COLONNE GAUCHE ════════════════════════════════════
 with col_left:
-    # Jumeau numerique
+    # ---- JUMEAU NUMÉRIQUE ----
     st.markdown("""
     <div style='background:#0f172a;border:1px solid #1e293b;border-radius:12px;
                 margin:1rem 0 0 1rem;padding:1rem 1rem 0;'>
@@ -175,24 +225,24 @@ with col_left:
         </div>
     </div>""", unsafe_allow_html=True)
 
-    # Dropdowns overlay simules
-    overlay_cols = st.columns([1, 3])
-    with overlay_cols[0]:
-        vue_mode = st.selectbox("", ["Vue libre", "Irradiance", "Temperature", "Production", "Pertes"],
-                                label_visibility="collapsed")
+    vue_mode = st.selectbox("", ["Vue libre", "Irradiance", "Temperature", "Production", "Pertes"],
+                            label_visibility="collapsed", key="vue_mode")
 
-    # SVG panneau PV
-    n = config["site"]["n_panels"]
+    # Dessin SVG des panneaux
+    n_panels = config["site"]["n_panels"]
+    cols_pv, rows_pv = 4, math.ceil(n_panels / 4)
+    status_colors = ["#22c55e"] * n_panels
+    if n_panels > 2:
+        status_colors[2] = "#f59e0b"   # un panneau en attention
+
     panel_svg = ""
-    cols_pv, rows_pv = 4, math.ceil(n / 4)
-    status_colors = ["#22c55e"] * n
-    if n > 3: status_colors[2] = "#f59e0b"  # simuler 1 panneau en attention
-
     for r in range(rows_pv):
         for c in range(4):
             idx = r * 4 + c
-            if idx >= n: break
-            x, y = 30 + c * 88, 20 + r * 58
+            if idx >= n_panels:
+                break
+            x = 30 + c * 88
+            y = 20 + r * 58
             col_fill = "#1a3a6e" if status_colors[idx] == "#22c55e" else "#3a2a10"
             panel_svg += f"""
             <rect x="{x}" y="{y}" width="72" height="46" rx="3"
@@ -227,7 +277,7 @@ with col_left:
         </div>
     </div>""", unsafe_allow_html=True)
 
-    # Flux d'energie
+    # ---- FLUX D'ÉNERGIE ----
     st.markdown("""
     <div style='background:#0f172a;border:1px solid #1e293b;border-radius:12px;
                 margin:1rem 0 0.5rem 1rem;padding:1rem 1rem .8rem;'>
@@ -254,6 +304,7 @@ with col_left:
 
 # ═══════════════════════ COLONNE DROITE ════════════════════════════════════
 with col_right:
+    # ---- PRODUCTION & PERFORMANCE ----
     st.markdown("""
     <div style='background:#0f172a;border:1px solid #1e293b;border-radius:12px;
                 margin:1rem 1rem 0 0;padding:1rem 1rem 0;'>
@@ -261,20 +312,20 @@ with col_right:
             PRODUCTION & PERFORMANCE</div>
     </div>""", unsafe_allow_html=True)
 
-    # Onglets periode
+    # Onglets période
     p_cols = st.columns(4)
     for col, period in zip(p_cols, ["Jour", "Semaine", "Mois", "Annee"]):
         with col:
             if st.button(period, key=f"p_{period}", use_container_width=True):
                 st.session_state.period = period
 
-    # Metriques
+    # Métriques
     m1, m2, m3 = st.columns(3)
     for col, label, val, unit in zip(
         [m1, m2, m3],
         ["Production", "Rendement specifique", "Performance Ratio"],
-        [f"{prod_jour}", f"{rend_spec}", f"{res['performance_ratio']*100:.1f}"],
-        ["MWh", "kWh/kWp", "%"],
+        [f"{prod_jour_kwh:.1f}", f"{rend_spec:.2f}", f"{res['performance_ratio']*100:.1f}"],
+        ["kWh", "kWh/kWp", "%"],
     ):
         with col:
             st.markdown(f"""
@@ -309,7 +360,7 @@ with col_right:
     )
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-    # Repartition des pertes
+    # ---- RÉPARTITION DES PERTES ----
     st.markdown("""
     <div style='background:#0f172a;border:1px solid #1e293b;border-radius:12px;
                 margin:.5rem 1rem 0 0;padding:1rem 1rem .5rem;'>
