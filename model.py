@@ -1,42 +1,58 @@
 # model.py — version corrigée
+import logging
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
 from typing import Union
 
+logger = logging.getLogger(__name__)
+
 
 class PVModel:
+    """
+    Modèle Digital Twin PV :
+    - Calcul instantané (compute)
+    - Calcul vectorisé (compute_series)
+    - Courbe I-V analytique (compute_iv_curve)
+    - Recalage adaptatif EMA (recalibrate)
+    """
+
     def __init__(self, config: dict):
         self.cfg = config
         panel = config["panel"]
         site  = config["site"]
 
-        self.pmp_stc    = panel["pmp_stc"]
-        self.eta_stc    = panel["eta_stc"]
-        self.area_m2    = panel["area_m2"]
-        self.gamma_pmp  = panel["gamma_pmp"]
-        self.noct       = panel["noct"]
-        self.voc_stc    = panel["voc"]
-        self.isc_stc    = panel["isc"]
-        self.vmp_stc    = panel["vmp"]
-        self.imp_stc    = panel["imp"]
+        # Paramètres panneau STC
+        self.pmp_stc   = panel["pmp_stc"]
+        self.eta_stc   = panel["eta_stc"]
+        self.area_m2   = panel["area_m2"]
+        self.gamma_pmp = panel["gamma_pmp"]
+        self.noct      = panel["noct"]
+        self.voc_stc   = panel["voc"]
+        self.isc_stc   = panel["isc"]
+        self.vmp_stc   = panel["vmp"]
+        self.imp_stc   = panel["imp"]
 
-        self.n_panels_total = site["n_panels"]
-        self.n_series       = site["series_per_string"]
-        self.n_parallel     = site["strings_per_mppt"] * site.get("n_mppt", 1)
+        # Topologie — "array" prioritaire, fallback "site" pour rétrocompatibilité
+        array = config.get("array", site)
+        self.n_panels_total = array["n_panels"]
+        self.n_series       = array["series_per_string"]
+        self.n_parallel     = array["strings_per_mppt"] * array.get("n_mppt", 1)
 
         # Vérification cohérence topologie
-        assert self.n_series * self.n_parallel == self.n_panels_total, (
-            f"Topologie incohérente : {self.n_series}s × {self.n_parallel}p "
-            f"= {self.n_series * self.n_parallel} ≠ n_panels={self.n_panels_total}"
-        )
+        expected = self.n_series * self.n_parallel
+        if expected != self.n_panels_total:
+            raise ValueError(
+                f"Topologie incohérente : {self.n_series}s × {self.n_parallel}p "
+                f"= {expected} ≠ n_panels={self.n_panels_total}"
+            )
 
         self.dc_losses       = config["losses"]["dc_total"]
         self.ac_efficiency   = config["losses"]["ac_efficiency"]
         self.p_inv_threshold = config["losses"].get("inverter_threshold_kw", 0.05)
 
-        self._recalibration_factor  = 0.1
-        self._last_recalibration    = None
+        self._recalibration_factor = 0.1
+        self._last_recalibration   = None
 
     # ── Modèle thermique ─────────────────────────────────────────────────
     def cell_temperature(self, irradiance: float, temp_ambient: float) -> float:
@@ -60,7 +76,6 @@ class PVModel:
         p_rated = self.cfg["inverter"]["p_rated_kw"]
         if p_dc_kw <= self.p_inv_threshold:
             return 0.0
-        # Approximation polynomiale du rendement européen
         load_ratio = min(p_dc_kw / p_rated, 1.0)
         eta = self.ac_efficiency * (1 - 0.03 * (1 - load_ratio) ** 2)
         return max(0.0, min(1.0, eta))
@@ -74,16 +89,21 @@ class PVModel:
     def compute(self, irradiance: float, temp_ambient: float) -> dict:
         """
         Calcule un point de fonctionnement instantané.
-        PR défini en DC (IEC 61724) pour rester homogène avec p_ref_kw (STC DC).
+        PR défini en DC (IEC 61724).
+
+        Clés retournées :
+            p_dc_kw, p_ac_kw, p_ref_kw,
+            performance_ratio, efficiency,
+            inverter_eta, temp_cell,
+            irradiance, temp_ambient
         """
-        t_cell   = self.cell_temperature(irradiance, temp_ambient)
-        p_panel  = self.panel_power(irradiance, t_cell)
-        p_dc_kw  = p_panel * self.n_panels_total * (1 - self.dc_losses) / 1000
+        t_cell  = self.cell_temperature(irradiance, temp_ambient)
+        p_panel = self.panel_power(irradiance, t_cell)
+        p_dc_kw = p_panel * self.n_panels_total * (1 - self.dc_losses) / 1000
 
-        eta_inv  = self.inverter_efficiency(p_dc_kw)
-        p_ac_kw  = p_dc_kw * eta_inv
+        eta_inv = self.inverter_efficiency(p_dc_kw)
+        p_ac_kw = p_dc_kw * eta_inv
 
-        # PR DC : grandeurs homogènes (DC vs référence DC STC)
         p_ref_kw = self.pmp_stc * self.n_panels_total * irradiance / 1_000_000
         pr_dc    = p_dc_kw / p_ref_kw if p_ref_kw > 0 else 0.0
 
@@ -91,7 +111,7 @@ class PVModel:
             "p_dc_kw":           round(p_dc_kw, 3),
             "p_ac_kw":           round(p_ac_kw, 3),
             "p_ref_kw":          round(p_ref_kw, 3),
-            "performance_ratio": round(pr_dc, 4),   # PR DC normalisé IEC 61724
+            "performance_ratio": round(pr_dc, 4),
             "efficiency":        round(self.efficiency(irradiance, t_cell) * 100, 2),
             "inverter_eta":      round(eta_inv * 100, 1),
             "temp_cell":         round(t_cell, 1),
@@ -117,7 +137,6 @@ class PVModel:
         p_dc_kw = eta_t * self.area_m2 * irr * self.n_panels_total * (1 - self.dc_losses) / 1000
         p_dc_kw = np.where(irr <= 0, 0.0, p_dc_kw)
 
-        # Rendement onduleur vectorisé
         p_rated = self.cfg["inverter"]["p_rated_kw"]
         load    = np.clip(p_dc_kw / p_rated, 0, 1)
         eta_inv = self.ac_efficiency * (1 - 0.03 * (1 - load) ** 2)
@@ -125,7 +144,7 @@ class PVModel:
         p_ac_kw = p_dc_kw * eta_inv
 
         p_ref_kw = self.pmp_stc * self.n_panels_total * irr / 1_000_000
-        pr_dc    = np.where(p_ref_kw > 0, p_dc_kw / p_ref_kw, 0.0)  # PR DC
+        pr_dc    = np.where(p_ref_kw > 0, p_dc_kw / p_ref_kw, 0.0)
 
         return pd.DataFrame({
             "p_dc_kw":           p_dc_kw,
@@ -142,38 +161,36 @@ class PVModel:
                     irradiance: float, temp_ambient: float):
         """
         Recalage EMA sur dc_losses à partir d'une mesure réelle.
-        À appeler uniquement depuis model_service.py, pas depuis app.py.
+        À appeler uniquement depuis model_service.py.
         """
         if irradiance < 50 or measured_p_ac_kw <= 0:
-            return  # Pas de recalage la nuit ou mesure nulle
+            return
 
         sim = self.compute(irradiance, temp_ambient)
         if sim["p_ac_kw"] <= 0:
             return
 
-        correction = measured_p_ac_kw / sim["p_ac_kw"]
-        # correction > 1 → modèle sous-estime → pertes DC trop élevées
-        # correction < 1 → modèle surestime → pertes DC trop faibles
+        correction    = measured_p_ac_kw / sim["p_ac_kw"]
         target_losses = 1.0 - (1.0 - self.dc_losses) * correction
-        target_losses = max(0.0, min(0.30, target_losses))  # bornes physiques [0%, 30%]
+        target_losses = max(0.0, min(0.30, target_losses))
 
-        # EMA : mise à jour progressive
         self.dc_losses += self._recalibration_factor * (target_losses - self.dc_losses)
         self._last_recalibration = datetime.now(timezone.utc).isoformat()
+        logger.info("Recalibration : dc_losses=%.4f", self.dc_losses)
 
     # ── État sérialisable ────────────────────────────────────────────────
     def get_state(self) -> dict:
         return {
-            "dc_losses":            self.dc_losses,
-            "ac_efficiency":        self.ac_efficiency,
-            "last_recalibration":   self._last_recalibration,
+            "dc_losses":          self.dc_losses,
+            "ac_efficiency":      self.ac_efficiency,
+            "last_recalibration": self._last_recalibration,
         }
 
     def set_state(self, state: dict):
-        """Restaure un état sauvegardé (depuis Redis, fichier JSON, etc.)."""
-        self.dc_losses             = state.get("dc_losses", self.dc_losses)
-        self.ac_efficiency         = state.get("ac_efficiency", self.ac_efficiency)
-        self._last_recalibration   = state.get("last_recalibration")
+        """Restaure un état sauvegardé (Redis, JSON, etc.)."""
+        self.dc_losses           = state.get("dc_losses", self.dc_losses)
+        self.ac_efficiency       = state.get("ac_efficiency", self.ac_efficiency)
+        self._last_recalibration = state.get("last_recalibration")
 
     # ── Courbe I-V ───────────────────────────────────────────────────────
     def compute_iv_curve(self, v_range: np.ndarray) -> dict:
@@ -184,16 +201,19 @@ class PVModel:
         vmp = self.vmp_stc * ns
         imp = self.imp_stc * np_
 
-        a  = np.log(isc / (isc - imp) + 1e-10)
-        rs = (voc - vmp) / imp
+        a       = np.log(isc / (isc - imp) + 1e-10)
+        rs      = (voc - vmp) / imp
         current = isc * (1 - np.exp((v_range - voc + rs * isc) / (voc / a + rs * isc) * a))
         current = np.clip(current, 0, isc)
+
         power_kw = v_range * current / 1000
-        idx = np.argmax(power_kw)
+        idx      = np.argmax(power_kw)
 
         return {
-            "voltage": v_range, "current": current, "power_kw": power_kw,
-            "p_mpp": round(power_kw[idx], 3),
-            "v_mpp": round(v_range[idx], 1),
-            "i_mpp": round(current[idx], 2),
+            "voltage":   v_range,
+            "current":   current,
+            "power_kw":  power_kw,
+            "p_mpp":     round(power_kw[idx], 3),
+            "v_mpp":     round(v_range[idx], 1),
+            "i_mpp":     round(current[idx], 2),
         }
