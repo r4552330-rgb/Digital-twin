@@ -1,4 +1,3 @@
-# app.py — Dashboard Streamlit du Jumeau Numérique PV
 import math
 from pathlib import Path
 from datetime import datetime
@@ -7,10 +6,10 @@ import streamlit as st
 import yaml
 import plotly.graph_objects as go
 
-from model import PVModel          # Votre modèle physique
-from data import DataFetcher       # Votre classe de récupération de données
+from model import PVModel
+from data import DataFetcher
 
-# ── CHARGEMENT CONFIGURATION (avec vérification) ───────────────────────────
+# ── CONFIG ─────────────────────────────────────────────────────────────────
 config_path = Path(__file__).parent / "config.yaml"
 if not config_path.exists():
     st.error("Fichier config.yaml introuvable.")
@@ -19,15 +18,11 @@ if not config_path.exists():
 with open(config_path, encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
-# Vérification rapide des sections attendues
-for section in ("site", "panel", "losses"):
+# Vérification minimale des sections
+for section in ("site", "array", "panel", "losses"):
     if section not in config:
-        st.error(f"Section '{section}' manquante dans config.yaml.")
+        st.error(f"Section '{section}' manquante dans config.yaml")
         st.stop()
-# Vérification plus fine
-if "n_panels" not in config["site"] or "pmp_stc" not in config["panel"]:
-    st.error("Clés obligatoires absentes (site.n_panels ou panel.pmp_stc).")
-    st.stop()
 
 # ── INITIALISATION ─────────────────────────────────────────────────────────
 pv      = PVModel(config)
@@ -35,46 +30,29 @@ fetcher = DataFetcher(config)
 
 st.set_page_config(
     page_title="PV Digital Twin",
-    page_icon=":sun:",                  # symbole texte (pas d'emoji graphique)
+    page_icon="☀️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ── SESSION STATE ──────────────────────────────────────────────────────────
-if "page" not in st.session_state:
-    st.session_state.page = "Vue d'ensemble"
-if "period" not in st.session_state:
-    st.session_state.period = "Jour"
+if "page"   not in st.session_state: st.session_state.page   = "Vue d'ensemble"
+if "period" not in st.session_state: st.session_state.period = "Jour"
 
-# ── CSS PERSONNALISÉ ───────────────────────────────────────────────────────
+# ── CSS ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-[data-testid="stSidebar"] {
-    background: #0f172a !important;
-    border-right: 1px solid #1e293b;
-}
-[data-testid="stSidebar"] * {
-    color: #94a3b8 !important;
-}
-.main .block-container {
-    padding: 0 !important;
-    max-width: 100% !important;
-}
-#MainMenu, footer, header {
-    visibility: hidden;
-}
-.stDeployButton {
-    display: none;
-}
-div[data-testid="stHorizontalBlock"] {
-    gap: 0 !important;
-}
+[data-testid="stSidebar"] { background:#0f172a !important; border-right:1px solid #1e293b; }
+[data-testid="stSidebar"] * { color:#94a3b8 !important; }
+.main .block-container { padding:0 !important; max-width:100% !important; }
+#MainMenu, footer, header { visibility:hidden; }
+.stDeployButton { display:none; }
+div[data-testid="stHorizontalBlock"] { gap:0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # ── SIDEBAR ────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # En-tête
     st.markdown("""
     <div style='padding:1.2rem 0.5rem 1.5rem;border-bottom:1px solid #1e293b;margin-bottom:1rem;'>
         <div style='display:flex;align-items:center;gap:10px;'>
@@ -88,7 +66,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # Navigation
     nav_items = [
         ("Accueil",   "Vue d'ensemble"),
         ("Jumeau",    "Jumeau numerique"),
@@ -101,43 +78,41 @@ with st.sidebar:
         ("Param.",    "Parametres"),
     ]
     for label, name in nav_items:
-        if st.button(label, key=f"nav_{name}", use_container_width=True):
+        if st.button(label, key=f"nav_{name}", width="stretch"):
             st.session_state.page = name
 
-    # Carte site
-    st.markdown("""
-    <div style='margin-top:1.5rem;padding-top:1rem;border-top:1px solid #1e293b;'>
+    st.markdown("""<div style='margin-top:1.5rem;padding-top:1rem;border-top:1px solid #1e293b;'>
         <div style='color:#475569!important;font-size:10px;text-transform:uppercase;
                     letter-spacing:.1em;padding:0 0.5rem;margin-bottom:0.4rem;'>SITE</div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.selectbox("", [config["site"]["name"]], label_visibility="collapsed")
+    </div>""", unsafe_allow_html=True)
 
-    # Capacité DC (en kWp)
-    cap_dc_kw = config["site"]["n_panels"] * config["panel"]["pmp_stc"] / 1000.0   # kW
+    # Affichage du nom du site sans selectbox (plus propre)
+    st.markdown(f"""
+    <div style='padding:0.3rem 0.5rem;'>
+        <div style='color:#94a3b8!important;font-size:13px;font-weight:600;'>{config['site']['name']}</div>
+    </div>""", unsafe_allow_html=True)
+
+    # Capacité DC
+    cap_dc = config["array"]["n_panels"] * config["panel"]["pmp_stc"] / 1000.0   # kW
     st.markdown(f"""
     <div style='padding:0.3rem 0.5rem;'>
         <div style='color:#475569!important;font-size:10px;'>Capacite DC</div>
-        <div style='color:#94a3b8!important;font-size:13px;font-weight:600;'>{cap_dc_kw:.2f} kWp</div>
-    </div>
-    """, unsafe_allow_html=True)
+        <div style='color:#94a3b8!important;font-size:13px;font-weight:600;'>{cap_dc:.2f} kWp</div>
+    </div>""", unsafe_allow_html=True)
 
-# ── RÉCUPÉRATION DES DONNÉES ───────────────────────────────────────────────
+# ── DATA ───────────────────────────────────────────────────────────────────
 try:
     data = fetcher.get_data()
-except Exception as e:
-    st.warning(f"Erreur de récupération des données : {e}")
+except Exception:
     data = {"irradiance": 0.0, "temperature": 25.0}
 
 res = pv.compute(data["irradiance"], data["temperature"])
 now = datetime.now()
 
-# ── COURBE DE PRODUCTION SIMULÉE (journée type) ────────────────────────────
-hours = list(range(25))
+hours     = list(range(25))
 p_ac_curve = []
-irr_curve = []
+irr_curve  = []
 for h in hours:
-    # Irradiance sinusoïdale entre 6h et 18h
     if 6 <= h <= 18:
         irr = 900 * math.sin(math.pi * (h - 6) / 12)
     else:
@@ -146,16 +121,18 @@ for h in hours:
     sim_res = pv.compute(irr, 25.0)
     p_ac_curve.append(sim_res["p_ac_kw"])
 
-prod_jour_kwh = round(sum(p_ac_curve), 2)                # kWh (somme des puissances horaires)
-co2_evite_kg  = round(res["p_ac_kw"] * 0.7, 0)          # kg (facteur 0.7 kg/kWh)
-rend_spec     = round((prod_jour_kwh / (cap_dc_kw * 1.0)) if cap_dc_kw > 0 else 0, 2) # kWh/kWp
+prod_jour_kwh = round(sum(p_ac_curve), 2)
+co2_evite_kg  = round(res["p_ac_kw"] * 0.7, 0)
+rend_spec     = round((prod_jour_kwh / cap_dc) if cap_dc > 0 else 0, 2)
 
-# Météo simplifiée
 meteo_label = "Ensoleille" if data["irradiance"] > 600 else ("Nuageux" if data["irradiance"] > 200 else "Couvert")
 meteo_symbol = "[Soleil]" if data["irradiance"] > 600 else ("[Nuage]" if data["irradiance"] > 200 else "[Pluie]")
 
-# Puissance nominale AC estimée
-p_rated_ac_kw = cap_dc_kw * config["losses"]["ac_efficiency"]   # kW
+# Puissance nominale AC estimée (si inverter section est présente)
+if "inverter" in config and "p_rated_kw" in config["inverter"]:
+    p_rated_ac_kw = config["inverter"]["p_rated_kw"]
+else:
+    p_rated_ac_kw = cap_dc * config["losses"]["ac_efficiency"]
 
 # ── BANDEAU HEADER ─────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -225,15 +202,20 @@ with col_left:
         </div>
     </div>""", unsafe_allow_html=True)
 
-    vue_mode = st.selectbox("", ["Vue libre", "Irradiance", "Temperature", "Production", "Pertes"],
-                            label_visibility="collapsed", key="vue_mode")
+    # Menu vue sans label vide
+    vue_mode = st.selectbox(
+        "Mode de visualisation",
+        ["Vue libre", "Irradiance", "Temperature", "Production", "Pertes"],
+        label_visibility="collapsed",
+        key="vue_mode"
+    )
 
     # Dessin SVG des panneaux
-    n_panels = config["site"]["n_panels"]
+    n_panels = config["array"]["n_panels"]
     cols_pv, rows_pv = 4, math.ceil(n_panels / 4)
     status_colors = ["#22c55e"] * n_panels
     if n_panels > 2:
-        status_colors[2] = "#f59e0b"   # un panneau en attention
+        status_colors[2] = "#f59e0b"
 
     panel_svg = ""
     for r in range(rows_pv):
@@ -312,14 +294,12 @@ with col_right:
             PRODUCTION & PERFORMANCE</div>
     </div>""", unsafe_allow_html=True)
 
-    # Onglets période
     p_cols = st.columns(4)
     for col, period in zip(p_cols, ["Jour", "Semaine", "Mois", "Annee"]):
         with col:
-            if st.button(period, key=f"p_{period}", use_container_width=True):
+            if st.button(period, key=f"p_{period}", width="stretch"):
                 st.session_state.period = period
 
-    # Métriques
     m1, m2, m3 = st.columns(3)
     for col, label, val, unit in zip(
         [m1, m2, m3],
@@ -335,7 +315,6 @@ with col_right:
                 <div style='color:#64748b;font-size:9px;'>{unit}</div>
             </div>""", unsafe_allow_html=True)
 
-    # Graphique courbes
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=hours, y=p_ac_curve, name="Production (AC)",
@@ -358,7 +337,7 @@ with col_right:
         yaxis=dict(tickfont=dict(color="#475569", size=8), gridcolor="#1e293b"),
         yaxis2=dict(overlaying="y", side="right", tickfont=dict(color="#475569", size=8), showgrid=False),
     )
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
     # ---- RÉPARTITION DES PERTES ----
     st.markdown("""
@@ -388,7 +367,7 @@ with col_right:
             height=155, margin=dict(l=0, r=0, t=0, b=0),
             paper_bgcolor="rgba(0,0,0,0)", showlegend=False,
         )
-        st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig_pie, width="stretch", config={"displayModeBar": False})
 
     with leg_col:
         leg_html = "<div style='padding:6px 0;'>"
@@ -408,7 +387,7 @@ st.markdown(f"""
 <div style='background:#0a1929;border-top:1px solid #1e293b;padding:.5rem 2rem;
             display:flex;justify-content:space-between;align-items:center;
             margin-top:.5rem;font-size:10px;color:#475569;'>
-    <span>PV Digital Twin v2.0 — {config["site"]["name"]}</span>
+    <span>PV Digital Twin v2.0 — {config['site']['name']}</span>
     <span>Mis a jour : {now.strftime("%d/%m/%Y %H:%M:%S")} | Source : Open-Meteo + IoT</span>
 </div>
 """, unsafe_allow_html=True)
