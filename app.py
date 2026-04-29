@@ -9,160 +9,283 @@ import plotly.graph_objects as go
 from model import PVModel
 from data import DataFetcher
 
-# ── PATH ─────────────────────────────────────
+# ── CONSTANTES ─────────────────────────────────────────
 BASE = Path(__file__).parent
 ASSETS = BASE / "assets"
+SCENE_IMG = ASSETS / "Scene_enset.png"
+CONFIG_PATH = BASE / "config.yaml"
 
-scene_img = ASSETS / "Scene_enset.png"
-
-# ── CONFIG ───────────────────────────────────
-with open(BASE / "config.yaml", encoding="utf-8") as f:
+# ── CONFIGURATION ──────────────────────────────────────
+with open(CONFIG_PATH, encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
 pv = PVModel(config)
 fetcher = DataFetcher(config)
 
-# ── THEME ────────────────────────────────────
+# ── THÈME ─────────────────────────────────────────────
 if "dark" not in st.session_state:
-    st.session_state.dark = False
+    st.session_state.dark = True   # thème sombre par défaut (cohérent avec l'ancien dashboard)
 
 def toggle_theme():
     st.session_state.dark = not st.session_state.dark
 
+# Appliquer les couleurs selon le thème
 if st.session_state.dark:
     BG = "#0f172a"
-    CARD = "#1e293b"
+    CARD_BG = "#1e293b"
     TEXT = "#f1f5f9"
+    SECONDARY = "#94a3b8"
+    ACCENT = "#f59e0b"
+    GREEN = "#4ade80"
+    BLUE = "#3b82f6"
+    RED = "#ef4444"
 else:
-    BG = "#f5f7fb"
-    CARD = "#ffffff"
-    TEXT = "#111827"
+    BG = "#f8fafc"
+    CARD_BG = "#ffffff"
+    TEXT = "#0f172a"
+    SECONDARY = "#64748b"
+    ACCENT = "#d97706"
+    GREEN = "#16a34a"
+    BLUE = "#2563eb"
+    RED = "#dc2626"
 
-# ── CSS ──────────────────────────────────────
+# ── CSS GLOBAL ─────────────────────────────────────────
 st.markdown(f"""
 <style>
-body {{ background:{BG}; color:{TEXT}; }}
-.block-container {{ padding:1rem 1.5rem; }}
-.card {{
-    background:{CARD};
-    padding:14px;
-    border-radius:12px;
-    box-shadow:0 3px 10px rgba(0,0,0,0.05);
+body, .stApp {{
+    background-color: {BG};
+    color: {TEXT};
 }}
-.sidebar-content {{ background:{CARD}; }}
+.block-container {{
+    padding: 1rem 2rem;
+}}
+.card {{
+    background-color: {CARD_BG};
+    border-radius: 12px;
+    padding: 1.2rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    margin-bottom: 0.8rem;
+}}
+.metric-label {{
+    font-size: 0.8rem;
+    color: {SECONDARY};
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}}
+.metric-value {{
+    font-size: 2rem;
+    font-weight: 700;
+    color: {TEXT};
+    line-height: 1.2;
+}}
+.sidebar .sidebar-content {{
+    background-color: {CARD_BG};
+}}
 </style>
 """, unsafe_allow_html=True)
 
-# ── SIDEBAR ──────────────────────────────────
+# ── SIDEBAR ────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## PV Digital Twin")
-    st.write("Smart Monitoring")
+    st.markdown("## ☀️ PV Digital Twin")
+    st.caption("Smart Solar Monitoring")
 
-    st.button("Dark Mode", on_click=toggle_theme)
+    st.button(
+        "🌙 Mode sombre" if not st.session_state.dark else "☀️ Mode clair",
+        on_click=toggle_theme,
+        use_container_width=True
+    )
 
-    st.markdown("---")
-    menu = [
-        "Vue d'ensemble",
-        "Jumeau numérique",
-        "Performance",
-        "Equipements",
-        "Alarmes",
-        "Analyses",
-    ]
+    st.divider()
 
-    page = st.radio("Navigation", menu)
+    menu = st.radio(
+        "Navigation",
+        ["Vue d'ensemble", "Jumeau numérique", "Performance", "Équipements", "Alarmes", "Analyses"],
+        index=0,
+        key="nav_menu"
+    )
 
-# ── DATA ─────────────────────────────────────
-data = fetcher.get_data()
+    st.divider()
+    st.markdown(f"**Site** : {config['site']['name']}")
+    cap_dc = config["array"]["n_panels"] * config["panel"]["pmp_stc"] / 1000.0
+    st.metric("Capacité DC", f"{cap_dc:.2f} kWp")
+
+# ── RÉCUPÉRATION DES DONNÉES ──────────────────────────
+try:
+    data = fetcher.get_data()
+except Exception:
+    data = {"irradiance": 0.0, "temperature": 25.0}
+
 res = pv.compute(data["irradiance"], data["temperature"])
 now = datetime.now()
 
-# ── HEADER KPI ───────────────────────────────
-st.markdown("### Vue globale")
+# ── PAGE PRINCIPALE (Vue d'ensemble) ───────────────────
+if menu == "Vue d'ensemble":
+    st.markdown("## Vue globale")
 
-k1, k2, k3, k4 = st.columns(4)
+    # Météo et indicateurs principaux
+    meteo_label = "Ensoleillé" if data["irradiance"] > 600 else ("Nuageux" if data["irradiance"] > 200 else "Couvert")
+    meteo_emoji = "☀️" if data["irradiance"] > 600 else ("⛅" if data["irradiance"] > 200 else "☁️")
 
-k1.markdown(f"<div class='card'><b>Puissance AC</b><h2>{res['p_ac_kw']:.2f} kW</h2></div>", unsafe_allow_html=True)
-k2.markdown(f"<div class='card'><b>Production jour</b><h2>{res['p_ac_kw']*5:.2f} kWh</h2></div>", unsafe_allow_html=True)
-k3.markdown(f"<div class='card'><b>PR</b><h2>{res.get('performance_ratio',0):.2f}</h2></div>", unsafe_allow_html=True)
-k4.markdown(f"<div class='card'><b>Temp cellule</b><h2>{res['temp_cell']} °C</h2></div>", unsafe_allow_html=True)
+    col_meteo, col_pac, col_prod, col_pr = st.columns(4)
 
-# ── LAYOUT PRINCIPAL ─────────────────────────
-left, right = st.columns([3,2])
+    with col_meteo:
+        st.markdown(f"<div class='card' style='text-align:center;'>"
+                    f"<div style='font-size:2.5rem;'>{meteo_emoji}</div>"
+                    f"<div class='metric-label'>{meteo_label}</div>"
+                    f"<div class='metric-value'>{data['temperature']:.1f}°C</div>"
+                    f"<div class='metric-label'>Irradiance {data['irradiance']:.0f} W/m²</div>"
+                    f"</div>", unsafe_allow_html=True)
 
-# ═════════ LEFT ═════════
-with left:
+    with col_pac:
+        st.markdown(f"<div class='card'>"
+                    f"<div class='metric-label'>Puissance AC</div>"
+                    f"<div class='metric-value'>{res['p_ac_kw']:.2f} kW</div>"
+                    f"</div>", unsafe_allow_html=True)
 
-    st.markdown("### Jumeau numérique")
+    with col_prod:
+        # Production journalière estimée (cumul horaire simulé)
+        prod_jour = 0
+        for h in range(24):
+            irr = 900 * math.sin(math.pi * (h - 6) / 12) if 6 <= h <= 18 else 0
+            prod_jour += pv.compute(irr, 25)["p_ac_kw"]
+        st.markdown(f"<div class='card'>"
+                    f"<div class='metric-label'>Production jour</div>"
+                    f"<div class='metric-value'>{prod_jour:.1f} kWh</div>"
+                    f"</div>", unsafe_allow_html=True)
 
-    st.image(str(scene_img), use_container_width=True)
+    with col_pr:
+        pr = res.get('performance_ratio', 0)
+        st.markdown(f"<div class='card'>"
+                    f"<div class='metric-label'>Performance Ratio</div>"
+                    f"<div class='metric-value'>{pr:.2f}</div>"
+                    f"</div>", unsafe_allow_html=True)
 
-    st.markdown("### Flux énergie")
+    # ── CORPS PRINCIPAL ───────────────────────────────
+    col_left, col_right = st.columns([3, 2], gap="medium")
 
-    f1, f2, f3, f4 = st.columns(4)
-
-    f1.markdown(f"<div class='card'>PV<br><b>{res['p_dc_kw']:.2f}</b></div>", unsafe_allow_html=True)
-    f2.markdown(f"<div class='card'>Onduleur<br><b>{res['p_ac_kw']:.2f}</b></div>", unsafe_allow_html=True)
-    f3.markdown(f"<div class='card'>Charge<br><b>0.00</b></div>", unsafe_allow_html=True)
-    f4.markdown(f"<div class='card'>Réseau<br><b>{res['p_ac_kw']:.2f}</b></div>", unsafe_allow_html=True)
-
-    # état équipements
-    st.markdown("### Etat équipements")
-
-    fig_pie = go.Figure(go.Pie(
-        labels=["Normal","Attention","Alarme"],
-        values=[80,15,5],
-        hole=0.6
-    ))
-
-    st.plotly_chart(fig_pie, use_container_width=True)
-
-# ═════════ RIGHT ═════════
-with right:
-
-    st.markdown("### Production & Performance")
-
-    hours = list(range(24))
-    prod = []
-
-    for h in hours:
-        if 6 <= h <= 18:
-            irr = 900 * math.sin(math.pi*(h-6)/12)
+    with col_left:
+        st.markdown("### Jumeau numérique")
+        # Affichage de la scène avec des indicateurs de statut superposés
+        if SCENE_IMG.exists():
+            st.image(str(SCENE_IMG), use_container_width=True)
         else:
-            irr = 0
+            st.warning("Image de scène introuvable. Placez 'Scene_enset.png' dans le dossier assets.")
+            # Version SVG de secours (dessin simplifié des panneaux)
+            # (Vous pouvez intégrer le SVG des panneaux ici si besoin)
 
-        sim = pv.compute(irr, 25)
-        prod.append(sim["p_ac_kw"])
+        st.markdown("### Flux d'énergie")
+        flux_cols = st.columns(4)
+        flux_data = [
+            ("PV", f"{res['p_dc_kw']:.2f} kW", GREEN),
+            ("Onduleur", f"{res['p_ac_kw']:.2f} kW", BLUE),
+            ("Charge", "0.00 kW", SECONDARY),
+            ("Réseau", f"{res['p_ac_kw']:.2f} kW", GREEN if res['p_ac_kw'] > 0 else SECONDARY),
+        ]
+        for col, (label, val, colr) in zip(flux_cols, flux_data):
+            col.markdown(f"""
+            <div class='card' style='text-align:center;'>
+                <div style='color:{colr}; font-size:1.2rem; font-weight:600;'>{label}</div>
+                <div style='font-size:1.5rem; font-weight:700; margin-top:4px;'>{val}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-    fig = go.Figure()
+        # État des équipements (donut)
+        st.markdown("### État des équipements")
+        # Calcul basé sur un état fictif pour l'exemple :
+        # On peut simuler un état par panneau avec le modèle, ici on utilise un résumé global
+        fig_state = go.Figure(go.Pie(
+            labels=["Normal", "Attention", "Alarme"],
+            values=[10, 2, 0],      # 12 panneaux, 2 en attention (ex. panneau 2)
+            hole=0.6,
+            marker=dict(colors=[GREEN, ACCENT, RED]),
+            textinfo="none"
+        ))
+        fig_state.update_layout(
+            margin=dict(l=0, r=0, t=10, b=10),
+            height=200,
+            paper_bgcolor=CARD_BG,
+            plot_bgcolor="rgba(0,0,0,0)",
+            showlegend=True,
+            legend=dict(orientation="h", font=dict(color=SECONDARY))
+        )
+        st.plotly_chart(fig_state, width="stretch")
 
-    fig.add_trace(go.Scatter(
-        x=hours,
-        y=prod,
-        fill='tozeroy'
-    ))
+    with col_right:
+        st.markdown("### Production & Performance")
 
-    st.plotly_chart(fig, use_container_width=True)
+        # Courbe de puissance journalière simulée
+        hours = list(range(24))
+        prod_curve = []
+        irr_curve = []
+        for h in hours:
+            irr = 900 * math.sin(math.pi * (h - 6) / 12) if 6 <= h <= 18 else 0
+            irr_curve.append(max(0, irr))
+            sim = pv.compute(irr, 25)
+            prod_curve.append(sim["p_ac_kw"])
 
-    # pertes
-    st.markdown("### Pertes")
+        fig_prod = go.Figure()
+        fig_prod.add_trace(go.Scatter(
+            x=hours, y=prod_curve,
+            fill='tozeroy',
+            line=dict(color=GREEN),
+            name="Production (kW)"
+        ))
+        fig_prod.add_trace(go.Scatter(
+            x=hours, y=[i/1000 for i in irr_curve],
+            yaxis="y2",
+            line=dict(color=BLUE, dash="dot"),
+            name="Irradiance / 1000"
+        ))
+        fig_prod.update_layout(
+            height=250,
+            margin=dict(l=0, r=0, t=0, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(tickvals=[0,6,12,18,24], ticktext=["00h","06h","12h","18h","24h"]),
+            yaxis=dict(title="kW"),
+            yaxis2=dict(overlaying="y", side="right", title="W/m²"),
+            legend=dict(orientation="h", y=1.1)
+        )
+        st.plotly_chart(fig_prod, width="stretch")
 
-    fig_loss = go.Figure(go.Pie(
-        labels=["Température","Câbles","Onduleur"],
-        values=[4,2,3]
-    ))
+        # Pertes calculées à partir de la config
+        st.markdown("### Répartition des pertes")
+        pertes = {
+            "Température": round(pv.compute(1000, 25)["p_ac_kw"] - pv.compute(1000, 45)["p_ac_kw"], 2),  # effet T
+            "Câblage DC": round(config["losses"]["dc_total"] * 100, 1),
+            "Onduleur": round((1 - config["losses"]["ac_efficiency"]) * 100, 1),
+        }
+        fig_pertes = go.Figure(go.Pie(
+            labels=list(pertes.keys()),
+            values=list(pertes.values()),
+            hole=0.4,
+            marker=dict(colors=[ACCENT, BLUE, RED])
+        ))
+        fig_pertes.update_layout(
+            margin=dict(l=0, r=0, t=0, b=0),
+            height=200,
+            paper_bgcolor="rgba(0,0,0,0)",
+            showlegend=True,
+            legend=dict(font=dict(color=SECONDARY))
+        )
+        st.plotly_chart(fig_pertes, width="stretch")
 
-    st.plotly_chart(fig_loss, use_container_width=True)
+        # Alarmes factices
+        st.markdown("### Alarmes récentes")
+        st.markdown(f"""
+        <div class='card'>
+            <div style='color:{RED}; font-weight:600;'>⚠️ Défaut onduleur</div>
+            <div style='color:{SECONDARY}; font-size:0.8rem;'>Aujourd'hui 08:23</div>
+        </div>
+        <div class='card'>
+            <div style='color:{ACCENT}; font-weight:600;'>Température cellule élevée</div>
+            <div style='color:{SECONDARY}; font-size:0.8rem;'>Aujourd'hui 12:05</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # alarmes
-    st.markdown("### Alarmes")
-
-    st.write("• Défaut onduleur")
-    st.write("• Température élevée")
-
-# ── FOOTER ───────────────────────────────────
+# ── PIED DE PAGE ────────────────────────────────────────
 st.markdown(f"""
-<div style='text-align:center;font-size:12px;color:gray;margin-top:20px;'>
-PV Digital Twin — {now.strftime("%d/%m/%Y %H:%M:%S")}
+<div style='text-align:center; color:{SECONDARY}; font-size:0.8rem; margin-top:2rem;'>
+    PV Digital Twin v2.1 — {config["site"]["name"]} — {now.strftime("%d/%m/%Y %H:%M:%S")}
 </div>
 """, unsafe_allow_html=True)
