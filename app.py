@@ -2,6 +2,7 @@
 PV Digital Twin – Smart Solar Monitoring
 app.py — fichier principal Streamlit
 Site : Mohammedia, Maroc | 3.96 kWp DC | 4.0 kW AC
+Version avec Dark/Light mode
 """
 
 import streamlit as st
@@ -27,196 +28,164 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DARK THEME CSS
+# THEME INITIALIZATION
 # ─────────────────────────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+if "theme" not in st.session_state:
+    st.session_state.theme = "dark"  # "dark" ou "light"
 
-  :root {
-    --bg-main:    #0d1117;
-    --bg-card:    #161b22;
-    --bg-card2:   #1c2230;
-    --border:     #30363d;
-    --green:      #50c878;
-    --orange:     #f0a500;
-    --red:        #e74c3c;
-    --blue:       #3498db;
-    --cyan:       #00bcd4;
-    --text-main:  #e6edf3;
-    --text-muted: #8b949e;
-    --font-main:  'Inter', sans-serif;
-    --font-head:  'Rajdhani', sans-serif;
-  }
+# ─────────────────────────────────────────────────────────────────────────────
+# DYNAMIC CSS (Dark / Light)
+# ─────────────────────────────────────────────────────────────────────────────
+def get_css(theme):
+    if theme == "dark":
+        return """
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
-  /* Base */
-  .stApp { background-color: var(--bg-main) !important; color: var(--text-main) !important; font-family: var(--font-main); }
-  .main .block-container { padding: 1rem 1.5rem 2rem 1.5rem; max-width: 100%; }
+          :root {
+            --bg-main:    #0d1117;
+            --bg-card:    #161b22;
+            --bg-card2:   #1c2230;
+            --border:     #30363d;
+            --text-main:  #e6edf3;
+            --text-muted: #8b949e;
+            --green:      #50c878;
+            --orange:     #f0a500;
+            --red:        #e74c3c;
+            --blue:       #3498db;
+            --cyan:       #00bcd4;
+            --font-main:  'Inter', sans-serif;
+            --font-head:  'Rajdhani', sans-serif;
+          }
 
-  /* Sidebar */
-  [data-testid="stSidebar"] {
-    background-color: #0d1117 !important;
-    border-right: 1px solid var(--border);
-  }
-  [data-testid="stSidebar"] > div { padding: 0 !important; }
+          .stApp { background-color: var(--bg-main) !important; color: var(--text-main) !important; font-family: var(--font-main); }
+          .main .block-container { padding: 1rem 1.5rem 2rem 1.5rem; max-width: 100%; }
+          [data-testid="stSidebar"] { background-color: var(--bg-main) !important; border-right: 1px solid var(--border); }
+          [data-testid="stSidebar"] > div { padding: 0 !important; }
+          .pv-card { background: var(--bg-card); border-radius: 12px; padding: 14px 16px; border: 1px solid var(--border); margin-bottom: 10px; transition: border-color .2s; }
+          .pv-card:hover { border-color: #50c87840; }
+          .pv-card-title { font-family: var(--font-head); font-size: 13px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--blue); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+          [data-testid="stMetric"] { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+          [data-testid="stMetricLabel"] { font-size: 11px !important; color: var(--text-muted) !important; text-transform: uppercase; letter-spacing: .8px; }
+          [data-testid="stMetricValue"] { font-family: var(--font-head); font-size: 26px !important; color: var(--text-main) !important; }
+          [data-testid="stTabs"] button { font-size: 12px !important; font-weight: 600; color: var(--text-muted) !important; border-bottom: 2px solid transparent; padding: 6px 14px; }
+          [data-testid="stTabs"] button[aria-selected="true"] { color: var(--blue) !important; border-bottom-color: var(--blue) !important; }
+          [data-testid="stRadio"] label { font-size: 13px !important; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+          [data-testid="stRadio"] label:hover { background: var(--bg-card2); }
+          .stButton > button { background: var(--bg-card2); border: 1px solid var(--border); color: var(--text-main); border-radius: 8px; font-size: 12px; padding: 6px 14px; font-weight: 500; }
+          .stButton > button:hover { border-color: var(--blue); background: #1c2230; }
+          ::-webkit-scrollbar { width: 5px; height: 5px; }
+          ::-webkit-scrollbar-track { background: var(--bg-main); }
+          ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+          [data-testid="stDataFrame"] { background: var(--bg-card); border-radius: 8px; }
+          .stAlert { border-radius: 8px; }
+          .sidebar-logo { padding: 20px 16px 14px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+          .sidebar-logo h2 { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--text-main); margin: 4px 0 2px; }
+          .sidebar-logo p { font-size: 11px; color: var(--orange); margin: 0; letter-spacing: .5px; }
+          .sidebar-info { background: var(--bg-card); border-radius: 8px; padding: 10px 14px; margin: 8px 10px; border: 1px solid var(--border); font-size: 11px; color: var(--text-muted); line-height: 1.7; }
+          .sidebar-info strong { color: var(--text-main); font-size: 12px; }
+          .energy-flow { display: flex; align-items: center; justify-content: space-between; gap: 4px; flex-wrap: wrap; padding: 8px 0; }
+          .flow-box { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; text-align: center; min-width: 80px; flex: 1; }
+          .flow-box .fb-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+          .flow-box .fb-value { font-family: var(--font-head); font-size: 16px; font-weight: 700; }
+          .flow-arrow { font-size: 18px; color: var(--green); flex-shrink: 0; }
+          .alarm-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #21262d; }
+          .alarm-icon { font-size: 16px; flex-shrink: 0; margin-top: 2px; }
+          .alarm-title { font-size: 12px; font-weight: 600; color: var(--text-main); }
+          .alarm-sub { font-size: 10px; color: var(--text-muted); }
+          .alarm-meta { margin-left: auto; text-align: right; font-size: 10px; color: var(--text-muted); }
+          .alarm-meta span { display: block; color: var(--red); font-weight: 600; }
+          .weather-card { text-align: center; padding: 10px; background: var(--bg-card2); border-radius: 10px; border: 1px solid var(--border); }
+          .weather-icon { font-size: 40px; }
+          .weather-temp { font-family: var(--font-head); font-size: 28px; color: var(--text-main); margin: 4px 0; }
+          .weather-sub { font-size: 11px; color: var(--text-muted); }
+          .fc-card { background: var(--bg-card2); border-radius: 8px; padding: 8px 10px; text-align: center; border: 1px solid var(--border); flex: 1; min-width: 70px; }
+          .fc-time { font-size: 11px; color: var(--text-muted); }
+          .fc-temp { font-family: var(--font-head); font-size: 18px; color: var(--text-main); }
+          .fc-rad { font-size: 10px; color: var(--orange); }
+          .kpi-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+          .kpi-mini { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; flex: 1; min-width: 80px; }
+          .kpi-mini .kl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+          .kpi-mini .kv { font-family: var(--font-head); font-size: 20px; font-weight: 700; }
+          .kpi-mini .ku { font-size: 10px; color: var(--text-muted); }
+        </style>
+        """
+    else:  # light theme
+        return """
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
-  /* Cards */
-  .pv-card {
-    background: var(--bg-card);
-    border-radius: 12px;
-    padding: 14px 16px;
-    border: 1px solid var(--border);
-    margin-bottom: 10px;
-    transition: border-color .2s;
-  }
-  .pv-card:hover { border-color: #50c87840; }
-  .pv-card-title {
-    font-family: var(--font-head);
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 1.2px;
-    text-transform: uppercase;
-    color: var(--blue);
-    margin-bottom: 10px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--border);
-  }
+          :root {
+            --bg-main:    #f5f7fa;
+            --bg-card:    #ffffff;
+            --bg-card2:   #eef2f6;
+            --border:     #dce4ec;
+            --text-main:  #1e2a3a;
+            --text-muted: #5a6e7c;
+            --green:      #2e8b57;
+            --orange:     #e67e22;
+            --red:        #c0392b;
+            --blue:       #2980b9;
+            --cyan:       #008b8b;
+            --font-main:  'Inter', sans-serif;
+            --font-head:  'Rajdhani', sans-serif;
+          }
 
-  /* KPI metrics */
-  [data-testid="stMetric"] {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-  }
-  [data-testid="stMetricLabel"] { font-size: 11px !important; color: var(--text-muted) !important; text-transform: uppercase; letter-spacing: .8px; }
-  [data-testid="stMetricValue"] { font-family: var(--font-head); font-size: 26px !important; color: var(--text-main) !important; }
-  [data-testid="stMetricDelta"] { font-size: 11px !important; }
+          .stApp { background-color: var(--bg-main) !important; color: var(--text-main) !important; font-family: var(--font-main); }
+          .main .block-container { padding: 1rem 1.5rem 2rem 1.5rem; max-width: 100%; }
+          [data-testid="stSidebar"] { background-color: var(--bg-main) !important; border-right: 1px solid var(--border); }
+          [data-testid="stSidebar"] > div { padding: 0 !important; }
+          .pv-card { background: var(--bg-card); border-radius: 12px; padding: 14px 16px; border: 1px solid var(--border); margin-bottom: 10px; transition: border-color .2s; }
+          .pv-card:hover { border-color: #2e8b5740; }
+          .pv-card-title { font-family: var(--font-head); font-size: 13px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--blue); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+          [data-testid="stMetric"] { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+          [data-testid="stMetricLabel"] { font-size: 11px !important; color: var(--text-muted) !important; text-transform: uppercase; letter-spacing: .8px; }
+          [data-testid="stMetricValue"] { font-family: var(--font-head); font-size: 26px !important; color: var(--text-main) !important; }
+          [data-testid="stTabs"] button { font-size: 12px !important; font-weight: 600; color: var(--text-muted) !important; border-bottom: 2px solid transparent; padding: 6px 14px; }
+          [data-testid="stTabs"] button[aria-selected="true"] { color: var(--blue) !important; border-bottom-color: var(--blue) !important; }
+          [data-testid="stRadio"] label { font-size: 13px !important; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+          [data-testid="stRadio"] label:hover { background: var(--bg-card2); }
+          .stButton > button { background: var(--bg-card2); border: 1px solid var(--border); color: var(--text-main); border-radius: 8px; font-size: 12px; padding: 6px 14px; font-weight: 500; }
+          .stButton > button:hover { border-color: var(--blue); background: #e2e8f0; }
+          ::-webkit-scrollbar { width: 5px; height: 5px; }
+          ::-webkit-scrollbar-track { background: var(--bg-main); }
+          ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+          [data-testid="stDataFrame"] { background: var(--bg-card); border-radius: 8px; }
+          .stAlert { border-radius: 8px; }
+          .sidebar-logo { padding: 20px 16px 14px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+          .sidebar-logo h2 { font-family: var(--font-head); font-size: 18px; font-weight: 700; color: var(--text-main); margin: 4px 0 2px; }
+          .sidebar-logo p { font-size: 11px; color: var(--orange); margin: 0; letter-spacing: .5px; }
+          .sidebar-info { background: var(--bg-card); border-radius: 8px; padding: 10px 14px; margin: 8px 10px; border: 1px solid var(--border); font-size: 11px; color: var(--text-muted); line-height: 1.7; }
+          .sidebar-info strong { color: var(--text-main); font-size: 12px; }
+          .energy-flow { display: flex; align-items: center; justify-content: space-between; gap: 4px; flex-wrap: wrap; padding: 8px 0; }
+          .flow-box { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; text-align: center; min-width: 80px; flex: 1; }
+          .flow-box .fb-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+          .flow-box .fb-value { font-family: var(--font-head); font-size: 16px; font-weight: 700; }
+          .flow-arrow { font-size: 18px; color: var(--green); flex-shrink: 0; }
+          .alarm-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #dce4ec; }
+          .alarm-icon { font-size: 16px; flex-shrink: 0; margin-top: 2px; }
+          .alarm-title { font-size: 12px; font-weight: 600; color: var(--text-main); }
+          .alarm-sub { font-size: 10px; color: var(--text-muted); }
+          .alarm-meta { margin-left: auto; text-align: right; font-size: 10px; color: var(--text-muted); }
+          .alarm-meta span { display: block; color: var(--red); font-weight: 600; }
+          .weather-card { text-align: center; padding: 10px; background: var(--bg-card2); border-radius: 10px; border: 1px solid var(--border); }
+          .weather-icon { font-size: 40px; }
+          .weather-temp { font-family: var(--font-head); font-size: 28px; color: var(--text-main); margin: 4px 0; }
+          .weather-sub { font-size: 11px; color: var(--text-muted); }
+          .fc-card { background: var(--bg-card2); border-radius: 8px; padding: 8px 10px; text-align: center; border: 1px solid var(--border); flex: 1; min-width: 70px; }
+          .fc-time { font-size: 11px; color: var(--text-muted); }
+          .fc-temp { font-family: var(--font-head); font-size: 18px; color: var(--text-main); }
+          .fc-rad { font-size: 10px; color: var(--orange); }
+          .kpi-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+          .kpi-mini { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; flex: 1; min-width: 80px; }
+          .kpi-mini .kl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+          .kpi-mini .kv { font-family: var(--font-head); font-size: 20px; font-weight: 700; }
+          .kpi-mini .ku { font-size: 10px; color: var(--text-muted); }
+        </style>
+        """
 
-  /* Tabs */
-  [data-testid="stTabs"] button {
-    font-size: 12px !important;
-    font-weight: 600;
-    color: var(--text-muted) !important;
-    border-bottom: 2px solid transparent;
-    padding: 6px 14px;
-  }
-  [data-testid="stTabs"] button[aria-selected="true"] {
-    color: var(--blue) !important;
-    border-bottom-color: var(--blue) !important;
-  }
-
-  /* Radio sidebar nav */
-  [data-testid="stRadio"] label {
-    font-size: 13px !important;
-    padding: 6px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  [data-testid="stRadio"] label:hover { background: var(--bg-card2); }
-
-  /* Buttons */
-  .stButton > button {
-    background: var(--bg-card2);
-    border: 1px solid var(--border);
-    color: var(--text-main);
-    border-radius: 8px;
-    font-size: 12px;
-    padding: 6px 14px;
-    font-weight: 500;
-  }
-  .stButton > button:hover { border-color: var(--blue); background: #1c2230; }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: var(--bg-main); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
-
-  /* dataframe */
-  [data-testid="stDataFrame"] { background: var(--bg-card); border-radius: 8px; }
-
-  /* alerts */
-  .stAlert { border-radius: 8px; }
-
-  /* sidebar logo area */
-  .sidebar-logo {
-    padding: 20px 16px 14px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 8px;
-  }
-  .sidebar-logo h2 {
-    font-family: var(--font-head);
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text-main);
-    margin: 4px 0 2px;
-  }
-  .sidebar-logo p { font-size: 11px; color: var(--orange); margin: 0; letter-spacing: .5px; }
-  .sidebar-info {
-    background: var(--bg-card);
-    border-radius: 8px;
-    padding: 10px 14px;
-    margin: 8px 10px;
-    border: 1px solid var(--border);
-    font-size: 11px;
-    color: var(--text-muted);
-    line-height: 1.7;
-  }
-  .sidebar-info strong { color: var(--text-main); font-size: 12px; }
-  .badge-alarm {
-    display: inline-block;
-    background: var(--red);
-    color: white;
-    border-radius: 50%;
-    width: 16px; height: 16px;
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 16px;
-    text-align: center;
-    margin-left: 6px;
-    vertical-align: middle;
-  }
-  .energy-flow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    flex-wrap: wrap;
-    padding: 8px 0;
-  }
-  .flow-box {
-    background: var(--bg-card2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 12px;
-    text-align: center;
-    min-width: 80px;
-    flex: 1;
-  }
-  .flow-box .fb-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
-  .flow-box .fb-value { font-family: var(--font-head); font-size: 16px; font-weight: 700; }
-  .flow-arrow { font-size: 18px; color: var(--green); flex-shrink: 0; }
-  .alarm-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid #21262d; }
-  .alarm-icon { font-size: 16px; flex-shrink: 0; margin-top: 2px; }
-  .alarm-title { font-size: 12px; font-weight: 600; color: var(--text-main); }
-  .alarm-sub { font-size: 10px; color: var(--text-muted); }
-  .alarm-meta { margin-left: auto; text-align: right; font-size: 10px; color: var(--text-muted); }
-  .alarm-meta span { display: block; color: var(--red); font-weight: 600; }
-  .weather-card { text-align: center; padding: 10px; background: var(--bg-card2); border-radius: 10px; border: 1px solid var(--border); }
-  .weather-icon { font-size: 40px; }
-  .weather-temp { font-family: var(--font-head); font-size: 28px; color: var(--text-main); margin: 4px 0; }
-  .weather-sub { font-size: 11px; color: var(--text-muted); }
-  .fc-card { background: var(--bg-card2); border-radius: 8px; padding: 8px 10px; text-align: center; border: 1px solid var(--border); flex: 1; min-width: 70px; }
-  .fc-time { font-size: 11px; color: var(--text-muted); }
-  .fc-temp { font-family: var(--font-head); font-size: 18px; color: var(--text-main); }
-  .fc-rad { font-size: 10px; color: var(--orange); }
-  .kpi-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-  .kpi-mini { background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; flex: 1; min-width: 80px; }
-  .kpi-mini .kl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
-  .kpi-mini .kv { font-family: var(--font-head); font-size: 20px; font-weight: 700; }
-  .kpi-mini .ku { font-size: 10px; color: var(--text-muted); }
-</style>
-""", unsafe_allow_html=True)
+# Injecter le CSS correspondant au thème actuel
+st.markdown(get_css(st.session_state.theme), unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONSTANTS & CONFIG
@@ -236,7 +205,6 @@ def load_config():
         try:
             with open("config.yaml") as f:
                 cfg = yaml.safe_load(f)
-                # merge with defaults
                 for k, v in DEFAULT_CONFIG.items():
                     if k not in cfg:
                         cfg[k] = v
@@ -276,26 +244,19 @@ class PVModel:
         self.p_rated   = ls["p_rated"]
 
     def compute(self, G, T_amb):
-        """Single point computation."""
         if G <= 0:
             return {"G": 0, "T_amb": T_amb, "T_cell": T_amb, "eta": 0,
                     "P_dc_kW": 0, "P_ac_kW": 0, "eta_inv": 0, "PR": 0}
-        # Cell temperature
         T_cell = T_amb + (self.NOCT - 20) / 800 * G
-        # Panel efficiency
         eta = self.eta_stc * (1 + self.gamma * (T_cell - 25))
         if G < 200:
             eta *= max(0, G / 200 * 0.97 + 0.03)
-        # DC power
         P_dc_kW = eta * self.area * G * self.n_panels * (1 - self.dc_losses) / 1000
-        # Inverter efficiency
         load_ratio = P_dc_kW / self.p_rated if self.p_rated > 0 else 0
         eta_inv = self.ac_eff * (1 - 0.03 * (1 - load_ratio) ** 2)
         if P_dc_kW < self.inv_thr:
             eta_inv = 0
-        # AC power
         P_ac_kW = P_dc_kW * eta_inv
-        # Performance Ratio
         P_ref_kW = self.Pmp * self.n_panels * G / 1_000_000
         PR = P_dc_kW / P_ref_kW if P_ref_kW > 0 else 0
         return {
@@ -305,7 +266,6 @@ class PVModel:
         }
 
     def compute_series(self, hours=None, G_series=None, T_series=None, seed=None):
-        """Generate time series DataFrame."""
         rng = np.random.default_rng(seed if seed is not None else 42)
         if hours is None:
             hours = np.arange(0, 24, 0.25)
@@ -329,7 +289,6 @@ class PVModel:
         return pd.DataFrame(rows)
 
     def compute_iv_curve(self, G=None, T_amb=None):
-        """Generate I-V and P-V curves."""
         G = G or 1000
         T_amb = T_amb or 25
         T_cell = T_amb + (self.NOCT - 20) / 800 * G
@@ -360,7 +319,6 @@ class PVModel:
         }
 
     def recalibrate(self, P_ac_measured, G, T_amb):
-        """Adaptive EMA recalibration."""
         r = self.compute(G, T_amb)
         P_ac_sim = r["P_ac_kW"]
         if P_ac_sim > 0:
@@ -369,7 +327,6 @@ class PVModel:
             target = max(0, min(0.30, target))
             self.dc_losses += 0.1 * (target - self.dc_losses)
         return self.dc_losses
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DATA FETCHER
@@ -419,18 +376,14 @@ class DataFetcher:
             return None, None, 0, 0, {}, "meteo_error"
 
     def get_live(self):
-        """Try Blynk → Open-Meteo → Simulation fallback."""
         T_b, G_b, status_b = self.fetch_blynk()
         if T_b is not None and G_b is not None:
             self.source = "Blynk ESP32"
             return G_b, T_b, self.source
-
         T_m, G_m, wind, code, hourly, status_m = self.fetch_open_meteo()
         if T_m is not None and G_m is not None:
             self.source = "Open-Meteo"
             return G_m, T_m, self.source
-
-        # Simulation
         h = datetime.now().hour + datetime.now().minute / 60
         G_sim = max(0, 900 * np.sin(np.pi * (h - 6) / 12)) if 6 <= h <= 18 else 0
         T_sim = 25 + 5 * np.sin(np.pi * (h - 10) / 14)
@@ -445,7 +398,6 @@ class DataFetcher:
             T_m = 25.0; wind = 8.0; code = 1
             hourly = {}
         return {"T": T_m, "G": G_m, "wind": wind, "code": code, "hourly": hourly, "source": status}
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # UTILS
@@ -522,18 +474,21 @@ def diagnose(pr, temp_cell, thresholds):
         alerts.append(("warning", f"🟡 Température cellule élevée : {temp_cell:.1f}°C"))
     return alerts
 
-PLOTLY_LAYOUT = dict(
-    paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(0,0,0,0)',
-    font=dict(color='#e6edf3', size=11, family='Inter'),
-    margin=dict(l=40, r=20, t=30, b=40),
-    xaxis=dict(gridcolor='#21262d', showgrid=True, zeroline=False),
-    yaxis=dict(gridcolor='#21262d', showgrid=True, zeroline=False),
-    legend=dict(bgcolor='rgba(0,0,0,0)', borderwidth=0),
-)
+def get_plotly_layout(theme):
+    font_color = '#e6edf3' if theme == 'dark' else '#1e2a3a'
+    grid_color = '#21262d' if theme == 'dark' else '#e2e8f0'
+    return dict(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color=font_color, size=11, family='Inter'),
+        margin=dict(l=40, r=20, t=30, b=40),
+        xaxis=dict(gridcolor=grid_color, showgrid=True, zeroline=False),
+        yaxis=dict(gridcolor=grid_color, showgrid=True, zeroline=False),
+        legend=dict(bgcolor='rgba(0,0,0,0)', borderwidth=0),
+    )
 
-def apply_layout(fig, **kwargs):
-    layout = {**PLOTLY_LAYOUT, **kwargs}
+def apply_layout(fig, theme, **kwargs):
+    layout = {**get_plotly_layout(theme), **kwargs}
     fig.update_layout(**layout)
     return fig
 
@@ -557,15 +512,15 @@ model = st.session_state.model
 fetcher = st.session_state.fetcher
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CACHED DATA FETCHERS
+# CACHED DATA FETCHERS (corrigé : plus d'argument non hachable)
 # ─────────────────────────────────────────────────────────────────────────────
 @st.cache_data(ttl=60)
-def fetch_live_data(_fetcher):
-    return _fetcher.get_live()
+def fetch_live_data():
+    return fetcher.get_live()
 
 @st.cache_data(ttl=900)
-def fetch_weather(_fetcher):
-    return _fetcher.get_weather_full()
+def fetch_weather():
+    return fetcher.get_weather_full()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SIDEBAR
@@ -605,10 +560,21 @@ with st.sidebar:
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
-    if st.button("🔄 Rafraîchir données", use_container_width=True):
-        st.cache_data.clear()
-        st.session_state.last_refresh = datetime.now()
-        st.rerun()
+    
+    # Bouton Dark/Light mode
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        if st.button("🌓 Dark/Light", use_container_width=True):
+            if st.session_state.theme == "dark":
+                st.session_state.theme = "light"
+            else:
+                st.session_state.theme = "dark"
+            st.rerun()
+    with col_btn2:
+        if st.button("🔄 Rafraîchir données", use_container_width=True):
+            st.cache_data.clear()
+            st.session_state.last_refresh = datetime.now()
+            st.rerun()
 
     ts = st.session_state.last_refresh.strftime("%H:%M:%S")
     st.caption(f"Dernière MàJ : {ts}")
@@ -616,11 +582,10 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────────────────────
 # FETCH LIVE DATA
 # ─────────────────────────────────────────────────────────────────────────────
-G_live, T_live, source_live = fetch_live_data(fetcher)
+G_live, T_live, source_live = fetch_live_data()
 result_live = model.compute(G_live, T_live)
-weather_data = fetch_weather(fetcher)
+weather_data = fetch_weather()
 
-# Precompute some values
 P_ac = result_live["P_ac_kW"]
 P_dc = result_live["P_dc_kW"]
 T_cell = result_live["T_cell"]
@@ -628,24 +593,19 @@ PR = result_live["PR"]
 eta = result_live["eta"]
 eta_inv = result_live["eta_inv"]
 
-# Daily energy (integrate 24h simulation)
 df_day = model.compute_series(seed=int(datetime.now().strftime("%Y%m%d")))
 energy_day_kWh = df_day["P_ac_kW"].mean() * 24
-energy_total_kWh = energy_day_kWh * 365 * 3  # 3 years estimate
+energy_total_kWh = energy_day_kWh * 365 * 3
 savings = compute_savings(energy_total_kWh, cfg)
-
 thresholds = cfg["thresholds"]
 alerts = diagnose(PR, T_cell, thresholds)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 1 — VUE D'ENSEMBLE
 # ═══════════════════════════════════════════════════════════════════════════════
 if page == "🏠 Vue d'ensemble":
 
-    # ── HEADER ──────────────────────────────────────────────────────────────
     hc1, hc2, hc3 = st.columns([2, 5, 3])
-
     with hc1:
         wicon = weather_icon(weather_data["code"])
         wlabel = weather_label(weather_data["code"])
@@ -653,9 +613,9 @@ if page == "🏠 Vue d'ensemble":
         <div class="weather-card">
           <div class="weather-icon">{wicon}</div>
           <div class="weather-temp">{weather_data['T']:.1f}°C</div>
-          <div style="font-size:12px; color:#e6edf3; margin-bottom:2px">{wlabel}</div>
-          <div class="weather-sub">Irradiance &nbsp;<strong style="color:#f0a500">{weather_data['G']:.0f} W/m²</strong></div>
-          <div class="weather-sub" style="margin-top:4px; font-size:10px; color:#50c878">● {source_live}</div>
+          <div style="font-size:12px; color:var(--text-main); margin-bottom:2px">{wlabel}</div>
+          <div class="weather-sub">Irradiance &nbsp;<strong style="color:var(--orange)">{weather_data['G']:.0f} W/m²</strong></div>
+          <div class="weather-sub" style="margin-top:4px; font-size:10px; color:var(--green)">● {source_live}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -678,47 +638,37 @@ if page == "🏠 Vue d'ensemble":
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-    # ── MAIN GRID ────────────────────────────────────────────────────────────
     col_left, col_right = st.columns([6, 4])
-
-    # ════ LEFT COLUMN ═════════════════════════════════════════════════
     with col_left:
-
-        # Panel 1 – 3D View / Digital Twin
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">☀ Jumeau numérique – Vue 3D</div>', unsafe_allow_html=True)
-
         scene_col, controls_col = st.columns([3, 1])
         with scene_col:
             if os.path.exists("assets/Scene_enset.png"):
                 st.image("assets/Scene_enset.png", use_container_width=True)
             else:
-                # Placeholder SVG solar farm
                 st.markdown("""
                 <div style="background:linear-gradient(135deg,#0d2137,#1a3a5c);border-radius:10px;
                             height:250px;display:flex;align-items:center;justify-content:center;
-                            border:1px solid #30363d;position:relative;overflow:hidden">
+                            border:1px solid var(--border);position:relative;overflow:hidden">
                   <div style="text-align:center">
                     <div style="font-size:60px">🔆</div>
-                    <div style="font-size:13px;color:#8b949e;margin-top:8px">Vue 3D – assets/Scene_enset.png</div>
-                    <div style="font-size:11px;color:#50c878;margin-top:4px">● 12 panneaux actifs</div>
+                    <div style="font-size:13px;color:var(--text-muted);margin-top:8px">Vue 3D – assets/Scene_enset.png</div>
+                    <div style="font-size:11px;color:var(--green);margin-top:4px">● 12 panneaux actifs</div>
                   </div>
-                  <div style="position:absolute;bottom:10px;right:10px;font-size:20px;opacity:.4">🧭</div>
                 </div>
                 """, unsafe_allow_html=True)
-
         with controls_col:
             st.radio("Vue", ["Vue libre","Irradiance","Température","Production","Pertes"],
                      label_visibility="collapsed", key="scene_view")
             st.markdown("""
             <div style="font-size:10px;line-height:2;margin-top:8px">
-              <span style="color:#50c878">⬤</span> Normal<br>
-              <span style="color:#f0a500">⬤</span> Attention<br>
-              <span style="color:#e74c3c">⬤</span> Alarme<br>
-              <span style="color:#3498db">⬤</span> Maintenance
+              <span style="color:var(--green)">⬤</span> Normal<br>
+              <span style="color:var(--orange)">⬤</span> Attention<br>
+              <span style="color:var(--red)">⬤</span> Alarme<br>
+              <span style="color:var(--blue)">⬤</span> Maintenance
             </div>
             """, unsafe_allow_html=True)
-
         tc = get_temp_color(T_cell)
         pc = get_performance_color(PR)
         st.markdown(f"""
@@ -730,7 +680,7 @@ if page == "🏠 Vue d'ensemble":
           </div>
           <div class="kpi-mini">
             <div class="kl">Rendement</div>
-            <div class="kv" style="color:#3498db">{eta*100:.1f}%</div>
+            <div class="kv" style="color:var(--blue)">{eta*100:.1f}%</div>
             <div class="ku">η panneau</div>
           </div>
           <div class="kpi-mini">
@@ -742,10 +692,8 @@ if page == "🏠 Vue d'ensemble":
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Panel 2 – Production & Performance
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">📊 Production & Performance</div>', unsafe_allow_html=True)
-
         t1, t2, t3, t4 = st.tabs(["Jour", "Semaine", "Mois", "Année"])
         with t1:
             mc1, mc2, mc3 = st.columns(3)
@@ -758,7 +706,6 @@ if page == "🏠 Vue d'ensemble":
                 st.metric("Rend. spécifique", f"{rs:.2f} kWh/kWp")
             with mc3:
                 st.metric("PR moyen", f"{pr_mean*100:.1f}%")
-
             fig_prod = make_subplots(specs=[[{"secondary_y": True}]])
             hours_plot = df_day["hour"]
             fig_prod.add_trace(go.Scatter(
@@ -775,38 +722,30 @@ if page == "🏠 Vue d'ensemble":
                                    gridcolor='#21262d', color='#e6edf3')
             fig_prod.update_yaxes(title_text="G (W/m²)", secondary_y=True,
                                    gridcolor='#21262d', color='#f0a500')
-            apply_layout(fig_prod, height=200, title_text="")
+            apply_layout(fig_prod, st.session_state.theme, height=200, title_text="")
             st.plotly_chart(fig_prod, use_container_width=True, config={"displayModeBar": False})
-
         with t2:
             seeds = [int(f"{datetime.now().strftime('%Y%m%d')}{i}") for i in range(7)]
             e_week = [model.compute_series(seed=s)["P_ac_kW"].mean()*24 for s in seeds]
             days = [(datetime.now() - timedelta(days=6-i)).strftime("%d/%m") for i in range(7)]
             fig_w = go.Figure(go.Bar(x=days, y=e_week, marker_color='#50c878', opacity=0.8))
-            apply_layout(fig_w, height=200)
+            apply_layout(fig_w, st.session_state.theme, height=200)
             st.plotly_chart(fig_w, use_container_width=True, config={"displayModeBar": False})
-
         with t3:
-            e_month = [model.compute_series(seed=i*100)["P_ac_kW"].mean()*24
-                       for i in range(1, 31)]
-            fig_m = go.Figure(go.Bar(x=list(range(1, 31)), y=e_month,
-                                     marker_color='#3498db', opacity=0.7))
-            apply_layout(fig_m, height=200)
+            e_month = [model.compute_series(seed=i*100)["P_ac_kW"].mean()*24 for i in range(1, 31)]
+            fig_m = go.Figure(go.Bar(x=list(range(1, 31)), y=e_month, marker_color='#3498db', opacity=0.7))
+            apply_layout(fig_m, st.session_state.theme, height=200)
             st.plotly_chart(fig_m, use_container_width=True, config={"displayModeBar": False})
-
         with t4:
             months = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]
             e_yr = [model.compute_series(seed=i*1000)["P_ac_kW"].mean()*24*30 for i in range(12)]
             fig_y = go.Figure(go.Bar(x=months, y=e_yr, marker_color='#f0a500', opacity=0.8))
-            apply_layout(fig_y, height=200)
+            apply_layout(fig_y, st.session_state.theme, height=200)
             st.plotly_chart(fig_y, use_container_width=True, config={"displayModeBar": False})
-
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Panel 3 – I-V Curve
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">⚡ Courbe I-V instantanée</div>', unsafe_allow_html=True)
-
         iv = model.compute_iv_curve(G=G_live if G_live > 10 else 800, T_amb=T_live)
         fig_iv = make_subplots(specs=[[{"secondary_y": True}]])
         fig_iv.add_trace(go.Scatter(
@@ -825,109 +764,89 @@ if page == "🏠 Vue d'ensemble":
         ), secondary_y=False)
         fig_iv.update_yaxes(title_text="Courant (A)", secondary_y=False, gridcolor='#21262d')
         fig_iv.update_yaxes(title_text="Puissance (kW)", secondary_y=True, gridcolor='#21262d')
-        apply_layout(fig_iv, height=200)
+        apply_layout(fig_iv, st.session_state.theme, height=200)
         st.plotly_chart(fig_iv, use_container_width=True, config={"displayModeBar": False})
-
         col_iv1, col_iv2, col_iv3 = st.columns(3)
         col_iv1.metric("P_mpp", f"{iv['P_mpp']/1000:.2f} kW")
         col_iv2.metric("V_mpp", f"{iv['V_mpp']:.1f} V")
         col_iv3.metric("I_mpp", f"{iv['I_mpp']:.2f} A")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Panel 4 – 7-day Performance Comparison
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">📉 Comparaison Performance 7 jours</div>', unsafe_allow_html=True)
-
         s1, s2, s3 = st.tabs(["PR", "Production spécifique", "Irradiance"])
         rng7 = np.random.default_rng(42)
         days7 = [(datetime.now() - timedelta(days=6-i)).strftime("%d/%m") for i in range(7)]
         pr7 = [model.compute_series(seed=i*77)["PR"].mean() for i in range(7)]
         pr7_exp = [p * 1.05 for p in pr7]
-
         with s1:
             fig7 = go.Figure()
             fig7.add_trace(go.Scatter(x=days7, y=[p*100 for p in pr7],
                                        name="PR Réel", line=dict(color='#50c878', width=2)))
             fig7.add_trace(go.Scatter(x=days7, y=[p*100 for p in pr7_exp],
                                        name="PR Attendu", line=dict(color='#f0a500', width=2, dash='dash')))
-            apply_layout(fig7, height=180)
+            apply_layout(fig7, st.session_state.theme, height=180)
             st.plotly_chart(fig7, use_container_width=True, config={"displayModeBar": False})
-
         with s2:
             pspec = [model.compute_series(seed=i*77)["P_ac_kW"].mean()*24 /
                      (cfg["panel"]["Pmp"]*cfg["array"]["n_panels"]/1000) for i in range(7)]
             fig7b = go.Figure()
             fig7b.add_trace(go.Scatter(x=days7, y=pspec, name="kWh/kWp",
                                         line=dict(color='#3498db', width=2)))
-            apply_layout(fig7b, height=180)
+            apply_layout(fig7b, st.session_state.theme, height=180)
             st.plotly_chart(fig7b, use_container_width=True, config={"displayModeBar": False})
-
         with s3:
             g7 = [model.compute_series(seed=i*77)["G"].max() for i in range(7)]
             fig7c = go.Figure(go.Bar(x=days7, y=g7, marker_color='#f0a500', opacity=0.8))
-            apply_layout(fig7c, height=180)
+            apply_layout(fig7c, st.session_state.theme, height=180)
             st.plotly_chart(fig7c, use_container_width=True, config={"displayModeBar": False})
-
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ════ RIGHT COLUMN ═════════════════════════════════════════════════
     with col_right:
-
-        # Panel 5 – Energy Flow
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">⚡ Flux d\'énergie</div>', unsafe_allow_html=True)
-
         dc_loss_kW = P_dc * model.dc_losses
         aux_kW = max(0, P_dc - P_ac)
         load_pct = P_ac / cfg["losses"]["p_rated"] * 100 if cfg["losses"]["p_rated"] > 0 else 0
         arrow_color = "#50c878" if load_pct > 80 else ("#f0a500" if load_pct > 50 else "#e74c3c")
-
-        def img_or_emoji(path, emoji, size=32):
-            if os.path.exists(path):
-                return f'<img src="{path}" width="{size}" style="border-radius:4px">'
-            return f'<span style="font-size:{size}px">{emoji}</span>'
-
         st.markdown(f"""
         <div class="energy-flow">
           <div class="flow-box">
             <div style="font-size:24px">☀️</div>
             <div class="fb-label">Générateur</div>
-            <div class="fb-value" style="color:#f0a500">{G_live:.0f}<br><span style="font-size:11px">W/m²</span></div>
+            <div class="fb-value" style="color:var(--orange)">{G_live:.0f}<br><span style="font-size:11px">W/m²</span></div>
           </div>
           <div class="flow-arrow" style="color:{arrow_color}">▶</div>
           <div class="flow-box">
             <div style="font-size:24px">🔋</div>
             <div class="fb-label">DC</div>
-            <div class="fb-value" style="color:#3498db">{P_dc:.2f}<br><span style="font-size:11px">kW</span></div>
+            <div class="fb-value" style="color:var(--blue)">{P_dc:.2f}<br><span style="font-size:11px">kW</span></div>
           </div>
           <div class="flow-arrow" style="color:{arrow_color}">▶</div>
           <div class="flow-box">
             <div style="font-size:24px">⚡</div>
             <div class="fb-label">AC</div>
-            <div class="fb-value" style="color:#50c878">{P_ac:.2f}<br><span style="font-size:11px">kW</span></div>
+            <div class="fb-value" style="color:var(--green)">{P_ac:.2f}<br><span style="font-size:11px">kW</span></div>
           </div>
           <div class="flow-arrow" style="color:{arrow_color}">▶</div>
           <div class="flow-box">
             <div style="font-size:24px">🏭</div>
             <div class="fb-label">Réseau</div>
-            <div class="fb-value" style="color:#e6edf3">{P_ac:.2f}<br><span style="font-size:11px">kW</span></div>
+            <div class="fb-value" style="color:var(--text-main)">{P_ac:.2f}<br><span style="font-size:11px">kW</span></div>
           </div>
         </div>
-        <div style="font-size:11px; color:#e74c3c; margin-top:4px">
+        <div style="font-size:11px; color:var(--red); margin-top:4px">
           ⬇️ Pertes DC : {dc_loss_kW:.3f} kW &nbsp;|&nbsp;
           ⬇️ Pertes onduleur : {aux_kW:.3f} kW
         </div>
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Panel 6 – Equipment Status
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">🔧 État des équipements</div>', unsafe_allow_html=True)
-
         eq_data = {"Normal": 8, "Attention": 2, "Alarme": 1, "Maintenance": 1}
         eq_colors = ["#50c878", "#f0a500", "#e74c3c", "#3498db"]
         eq_total = sum(eq_data.values())
-
         ec1, ec2 = st.columns([4, 5])
         with ec1:
             fig_eq = go.Figure(go.Pie(
@@ -938,26 +857,22 @@ if page == "🏠 Vue d'ensemble":
             ))
             fig_eq.add_annotation(text=f"<b>{eq_total}</b>", x=0.5, y=0.5,
                                    font=dict(size=18, color='#e6edf3'), showarrow=False)
-            apply_layout(fig_eq, height=160, showlegend=False, margin=dict(l=0, r=0, t=10, b=10))
+            apply_layout(fig_eq, st.session_state.theme, height=160, showlegend=False, margin=dict(l=0, r=0, t=10, b=10))
             st.plotly_chart(fig_eq, use_container_width=True, config={"displayModeBar": False})
-
         with ec2:
             for (label, count), color in zip(eq_data.items(), eq_colors):
                 pct = count / eq_total * 100
                 st.markdown(f"""
                 <div style="font-size:12px; margin-bottom:4px">
                   <span style="color:{color}">⬤</span> {label}
-                  <span style="float:right; color:#8b949e">{count} ({pct:.1f}%)</span>
+                  <span style="float:right; color:var(--text-muted)">{count} ({pct:.1f}%)</span>
                 </div>
                 """, unsafe_allow_html=True)
-
-        st.markdown('<a href="#" style="font-size:11px;color:#3498db">→ Voir tous les équipements</a>', unsafe_allow_html=True)
+        st.markdown('<a href="#" style="font-size:11px;color:var(--blue)">→ Voir tous les équipements</a>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Panel 7 – Loss Breakdown
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">📉 Répartition des pertes</div>', unsafe_allow_html=True)
-
         if G_live > 0:
             p_irr = max(0, (1 - eta / model.eta_stc) * P_dc * 0.6) * 100 / max(P_dc, 0.001)
             p_temp = abs(model.gamma * (T_cell - 25)) * 100
@@ -972,7 +887,6 @@ if page == "🏠 Vue d'ensemble":
             loss_labels = ["Irradiance","Température","DC","Onduleur","Câbles","Autres"]
             loss_vals = [6.2, 4.1, 10.0, 4.0, 0.5, 2.0]
             loss_colors = ["#3498db","#50c878","#e74c3c","#f0a500","#f39c12","#7f8c8d"]
-
         lc1, lc2 = st.columns([4, 5])
         with lc1:
             fig_loss = go.Figure(go.Pie(
@@ -984,25 +898,21 @@ if page == "🏠 Vue d'ensemble":
             total_loss = sum(loss_vals)
             fig_loss.add_annotation(text=f"<b>{total_loss:.1f}%</b>", x=0.5, y=0.5,
                                      font=dict(size=14, color='#e74c3c'), showarrow=False)
-            apply_layout(fig_loss, height=160, showlegend=False, margin=dict(l=0,r=0,t=10,b=10))
+            apply_layout(fig_loss, st.session_state.theme, height=160, showlegend=False, margin=dict(l=0,r=0,t=10,b=10))
             st.plotly_chart(fig_loss, use_container_width=True, config={"displayModeBar": False})
-
         with lc2:
             for label, val, color in zip(loss_labels, loss_vals, loss_colors):
                 st.markdown(f"""
                 <div style="font-size:11px;margin-bottom:3px">
                   <span style="color:{color}">⬤</span> {label}
-                  <span style="float:right;color:#8b949e">{val:.1f}%</span>
+                  <span style="float:right;color:var(--text-muted)">{val:.1f}%</span>
                 </div>
                 """, unsafe_allow_html=True)
-
-        st.markdown('<a href="#" style="font-size:11px;color:#3498db">→ Détails</a>', unsafe_allow_html=True)
+        st.markdown('<a href="#" style="font-size:11px;color:var(--blue)">→ Détails</a>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Panel 8 – Diagnostic
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">🩺 Diagnostic automatique</div>', unsafe_allow_html=True)
-
         if not alerts:
             st.success("✅ Système nominal – tous les paramètres dans les limites")
         else:
@@ -1011,7 +921,6 @@ if page == "🏠 Vue d'ensemble":
                     st.error(msg)
                 else:
                     st.warning(msg)
-
         day_sav = compute_savings(energy_day_kWh, cfg)
         sc1, sc2, sc3 = st.columns(3)
         sc1.metric("Économies", format_currency(day_sav["mad"]))
@@ -1019,10 +928,8 @@ if page == "🏠 Vue d'ensemble":
         sc3.metric("🌳 Arbres", f"{day_sav['trees']:.2f}")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Panel 9 – Recent Alarms
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">🔔 Alarmes récentes</div>', unsafe_allow_html=True)
-
         alarm_list = [
             {"icon": "🔴", "title": "Défaut communication INV-01", "sub": "Onduleur #01",
              "time": "10:15", "status": "Non acquittée", "color": "#e74c3c"},
@@ -1036,7 +943,6 @@ if page == "🏠 Vue d'ensemble":
                 alarm_list.append({"icon": "🟡", "title": a[1], "sub": "Auto-détecté",
                                    "time": datetime.now().strftime("%H:%M"),
                                    "status": "Auto", "color": "#f0a500"})
-
         for al in alarm_list[:3]:
             st.markdown(f"""
             <div class="alarm-row">
@@ -1051,21 +957,17 @@ if page == "🏠 Vue d'ensemble":
               </div>
             </div>
             """, unsafe_allow_html=True)
-
-        st.markdown('<a href="#" style="font-size:11px;color:#3498db">→ Voir toutes les alarmes</a>', unsafe_allow_html=True)
+        st.markdown('<a href="#" style="font-size:11px;color:var(--blue)">→ Voir toutes les alarmes</a>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Panel 10 – Weather & Forecast
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">🌤️ Météo & Prévisions</div>', unsafe_allow_html=True)
-
         now_h = datetime.now().hour
         forecasts = [
             {"time": f"{(now_h+3)%24:02d}:00", "icon": "🌤️", "temp": weather_data['T']+1, "G": 900},
             {"time": f"{(now_h+6)%24:02d}:00", "icon": "☀️", "temp": weather_data['T']+3, "G": 950},
             {"time": f"{(now_h+9)%24:02d}:00", "icon": "⛅", "temp": weather_data['T']+1, "G": 800},
         ]
-        # Try to use hourly data from Open-Meteo
         hourly = weather_data.get("hourly", {})
         if hourly and "temperature_2m" in hourly:
             times_h = hourly.get("time", [])
@@ -1083,7 +985,6 @@ if page == "🏠 Vue d'ensemble":
                     })
             if fc_new:
                 forecasts = fc_new[:3]
-
         fc_cols = st.columns(len(forecasts))
         for i, fc in enumerate(forecasts):
             with fc_cols[i]:
@@ -1095,10 +996,8 @@ if page == "🏠 Vue d'ensemble":
                   <div class="fc-rad">{fc['G']:.0f} W/m²</div>
                 </div>
                 """, unsafe_allow_html=True)
-
-        st.markdown('<a href="#" style="font-size:11px;color:#3498db;margin-top:6px;display:block">→ Voir la météo détaillée</a>', unsafe_allow_html=True)
+        st.markdown('<a href="#" style="font-size:11px;color:var(--blue);margin-top:6px;display:block">→ Voir la météo détaillée</a>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 2 — JUMEAU NUMÉRIQUE
@@ -1117,12 +1016,11 @@ elif page == "🧊 Jumeau numérique":
                         height:400px;display:flex;align-items:center;justify-content:center">
               <div style="text-align:center">
                 <div style="font-size:80px">🔆</div>
-                <div style="color:#8b949e;margin-top:12px">assets/Scene_enset.png requis</div>
+                <div style="color:var(--text-muted);margin-top:12px">assets/Scene_enset.png requis</div>
               </div>
             </div>
             """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-
     with c2:
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">Paramètres temps réel</div>', unsafe_allow_html=True)
@@ -1139,20 +1037,17 @@ elif page == "🧊 Jumeau numérique":
         for label, val in metrics_2:
             st.markdown(f"""
             <div style="display:flex;justify-content:space-between;padding:6px 0;
-                        border-bottom:1px solid #21262d;font-size:13px">
-              <span style="color:#8b949e">{label}</span>
-              <strong style="color:#e6edf3">{val}</strong>
+                        border-bottom:1px solid var(--border);font-size:13px">
+              <span style="color:var(--text-muted)">{label}</span>
+              <strong style="color:var(--text-main)">{val}</strong>
             </div>
             """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-
-        # Panel map
         st.markdown('<div class="pv-card">', unsafe_allow_html=True)
         st.markdown('<div class="pv-card-title">📍 Localisation</div>', unsafe_allow_html=True)
         loc_df = pd.DataFrame({"lat": [cfg["site"]["lat"]], "lon": [cfg["site"]["lon"]]})
         st.map(loc_df, zoom=10)
         st.markdown('</div>', unsafe_allow_html=True)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 3 — PERFORMANCE
@@ -1175,14 +1070,14 @@ elif page == "📈 Performance":
                                   fillcolor='rgba(80,200,120,0.1)'), secondary_y=False)
         fig.add_trace(go.Scatter(x=df["hour"], y=df["G"], name="G (W/m²)",
                                   line=dict(color='#f0a500', width=1.5, dash='dot')), secondary_y=True)
-        apply_layout(fig, height=260, title_text=f"Production & Irradiance – {label}")
+        apply_layout(fig, st.session_state.theme, height=260, title_text=f"Production & Irradiance – {label}")
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
         fig2 = go.Figure(go.Bar(
             x=df["hour"], y=df["PR"]*100,
             marker_color=[get_performance_color(p) for p in df["PR"]],
         ))
-        apply_layout(fig2, height=180, title_text="Performance Ratio (PR)")
+        apply_layout(fig2, st.session_state.theme, height=180, title_text="Performance Ratio (PR)")
         st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
 
         st.dataframe(
@@ -1204,7 +1099,6 @@ elif page == "📈 Performance":
     with tab_y:
         df_y = pd.concat([model.compute_series(seed=i*1000) for i in range(12)], ignore_index=True)
         perf_tab(df_y, "Année")
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 4 — ÉQUIPEMENTS
@@ -1232,7 +1126,7 @@ elif page == "⚙️ Équipements":
             labels=list(eq_counts.keys()), values=list(eq_counts.values()),
             marker_colors=["#50c878","#f0a500","#e74c3c","#3498db"], hole=0.5
         ))
-        apply_layout(fig_e, height=220, showlegend=True)
+        apply_layout(fig_e, st.session_state.theme, height=220, showlegend=True)
         st.plotly_chart(fig_e, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1243,10 +1137,9 @@ elif page == "⚙️ Équipements":
         prods = [P_dc/12 * (1 + np.random.default_rng(i).normal(0, 0.05)) for i in range(12)]
         colors = ["#50c878" if p > P_dc/12*0.9 else "#f0a500" for p in prods]
         fig_pan = go.Figure(go.Bar(x=panels, y=prods, marker_color=colors))
-        apply_layout(fig_pan, height=220)
+        apply_layout(fig_pan, st.session_state.theme, height=220)
         st.plotly_chart(fig_pan, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 5 — ALARMES
@@ -1275,7 +1168,6 @@ elif page == "🔔 Alarmes":
     a3.metric("Attention", sum(1 for a in alarm_full if "ATTENTION" in a["Priorité"]))
     a4.metric("Non acquittées", sum(1 for a in alarm_full if "Non" in a["État"]))
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 6 — ANALYSES
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1300,7 +1192,7 @@ elif page == "🔍 Analyses":
                        secondary_y=False)
     fig_iv2.update_yaxes(title_text="Courant (A)", secondary_y=False, gridcolor='#21262d')
     fig_iv2.update_yaxes(title_text="Puissance (kW)", secondary_y=True, gridcolor='#21262d')
-    apply_layout(fig_iv2, height=300, title_text=f"G={g_slider}W/m² | T={t_slider}°C | MPP={iv2['P_mpp']/1000:.2f}kW")
+    apply_layout(fig_iv2, st.session_state.theme, height=300, title_text=f"G={g_slider}W/m² | T={t_slider}°C | MPP={iv2['P_mpp']/1000:.2f}kW")
     st.plotly_chart(fig_iv2, use_container_width=True, config={"displayModeBar": False})
 
     st.markdown("---")
@@ -1340,7 +1232,6 @@ elif page == "🔍 Analyses":
     elif do_recal:
         st.warning("Irradiance nulle, recalibration impossible.")
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 7 — RAPPORTS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1375,7 +1266,6 @@ elif page == "📄 Rapports":
         })
         st.table(eco_df)
 
-        # Production vs forecast chart
         periods = ["J-6","J-5","J-4","J-3","J-2","J-1","Auj"]
         prod_vals = [model.compute_series(seed=i*77)["P_ac_kW"].mean()*24 for i in range(7)]
         fc_vals = [p * 1.08 for p in prod_vals]
@@ -1385,17 +1275,15 @@ elif page == "📄 Rapports":
         fig_rep.add_trace(go.Bar(name="Prévision", x=periods, y=fc_vals,
                                   marker_color='#3498db', opacity=0.5))
         fig_rep.update_layout(barmode='group')
-        apply_layout(fig_rep, height=220, title_text="Production vs Prévision (kWh)")
+        apply_layout(fig_rep, st.session_state.theme, height=220, title_text="Production vs Prévision (kWh)")
         st.plotly_chart(fig_rep, use_container_width=True, config={"displayModeBar": False})
 
-    # Download CSV
     csv_df = df_day.copy()
     csv_df["date"] = datetime.now().strftime("%Y-%m-%d")
     csv_bytes = csv_df.to_csv(index=False).encode()
     st.download_button("📥 Télécharger CSV", data=csv_bytes,
                         file_name=f"rapport_{datetime.now().strftime('%Y%m%d')}.csv",
                         mime="text/csv")
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 8 — MÉTÉO
@@ -1408,13 +1296,13 @@ elif page == "🌤️ Météo":
         st.markdown(f"""
         <div class="pv-card" style="text-align:center">
           <div style="font-size:60px">{weather_icon(weather_data['code'])}</div>
-          <div style="font-family:'Rajdhani';font-size:36px;font-weight:700;color:#e6edf3">
+          <div style="font-family:'Rajdhani';font-size:36px;font-weight:700;color:var(--text-main)">
             {weather_data['T']:.1f}°C</div>
-          <div style="color:#8b949e;font-size:13px">{weather_label(weather_data['code'])}</div>
-          <hr style="border-color:#30363d;margin:10px 0">
-          <div style="font-size:12px;color:#f0a500">☀️ {weather_data['G']:.0f} W/m²</div>
-          <div style="font-size:12px;color:#3498db">💨 {weather_data['wind']:.1f} km/h</div>
-          <div style="font-size:10px;color:#50c878;margin-top:6px">Source: {weather_data['source']}</div>
+          <div style="color:var(--text-muted);font-size:13px">{weather_label(weather_data['code'])}</div>
+          <hr style="border-color:var(--border);margin:10px 0">
+          <div style="font-size:12px;color:var(--orange)">☀️ {weather_data['G']:.0f} W/m²</div>
+          <div style="font-size:12px;color:var(--blue)">💨 {weather_data['wind']:.1f} km/h</div>
+          <div style="font-size:10px;color:var(--green);margin-top:6px">Source: {weather_data['source']}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1438,7 +1326,7 @@ elif page == "🌤️ Météo":
                                      line=dict(color='#e74c3c', width=2)), secondary_y=True)
         fig_wx.update_yaxes(title_text="Irradiance W/m²", secondary_y=False, gridcolor='#21262d')
         fig_wx.update_yaxes(title_text="T° (°C)", secondary_y=True, gridcolor='#21262d')
-        apply_layout(fig_wx, height=280, title_text="Prévisions horaires 24h")
+        apply_layout(fig_wx, st.session_state.theme, height=280, title_text="Prévisions horaires 24h")
         st.plotly_chart(fig_wx, use_container_width=True, config={"displayModeBar": False})
 
     with wc3:
@@ -1447,7 +1335,7 @@ elif page == "🌤️ Météo":
         loc_df = pd.DataFrame({"lat": [cfg["site"]["lat"]], "lon": [cfg["site"]["lon"]]})
         st.map(loc_df, zoom=9)
         st.markdown(f"""
-        <div style="font-size:11px;color:#8b949e;margin-top:6px">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px">
           Mohammedia, Maroc<br>
           Lat {cfg['site']['lat']} | Lon {cfg['site']['lon']}<br>
           Alt {cfg['site']['alt']}m | Tilt {cfg['site']['tilt']}° | Az {cfg['site']['azimuth']}°
@@ -1455,7 +1343,6 @@ elif page == "🌤️ Météo":
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 7-day forecast table
     st.markdown("### Prévisions 7 jours")
     days_fc = [(datetime.now() + timedelta(days=i)).strftime("%a %d/%m") for i in range(7)]
     max_temps = [weather_data['T'] + np.random.default_rng(i*3).normal(0, 3) for i in range(7)]
@@ -1469,7 +1356,6 @@ elif page == "🌤️ Météo":
         "Irradiance (W/m²)": [f"{g:.0f}" for g in g_fc],
     })
     st.dataframe(df_fc, use_container_width=True, hide_index=True)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 9 — PARAMÈTRES
@@ -1569,7 +1455,6 @@ elif page == "⚙️ Paramètres":
             st.success("🔄 Configuration réinitialisée aux valeurs par défaut.")
             st.rerun()
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # AUTO-REFRESH (60s)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1577,28 +1462,15 @@ try:
     from streamlit_autorefresh import st_autorefresh
     st_autorefresh(interval=60_000, key="auto_refresh")
 except ImportError:
-    pass  # optional dependency
-
+    pass
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FOOTER
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
-<hr style="border-color:#21262d;margin-top:30px">
-<div style="text-align:center;font-size:11px;color:#8b949e;padding-bottom:10px">
+<hr style="border-color:var(--border);margin-top:30px">
+<div style="text-align:center;font-size:11px;color:var(--text-muted);padding-bottom:10px">
   ☀️ PV Digital Twin – Smart Solar Monitoring &nbsp;|&nbsp; Mohammedia, Maroc &nbsp;|&nbsp;
   Modèle IEC 61215 / IEC 61724 &nbsp;|&nbsp; v1.0.0
 </div>
 """, unsafe_allow_html=True)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# REQUIREMENTS (reference)
-# ─────────────────────────────────────────────────────────────────────────────
-# streamlit>=1.32
-# plotly>=5.18
-# pandas>=2.0
-# numpy>=1.26
-# requests>=2.31
-# pyyaml>=6.0
-# streamlit-autorefresh>=0.0.1  (optionnel – auto-refresh 60s)
