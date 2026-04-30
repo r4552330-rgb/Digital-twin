@@ -525,18 +525,18 @@ with st.sidebar:
     st.caption(f"MaJ: {st.session_state.last_refresh.strftime('%H:%M:%S')}")
 
 # ─────────────────────────────────────────────────────────────
-# ACQUIRE LIVE DATA
+# ACQUIRE LIVE DATA  (Lines 527-539)
 # ─────────────────────────────────────────────────────────────
 G_live, T_live, source_label, mode_tag = acquire_data()
 weather_data = try_fetch_weather()
 
 result_live = model.compute(G_live, T_live)
-P_ac    = float(result_live["P_ac_kW"])
-P_dc    = float(result_live["P_dc_kW"])
-T_cell  = float(result_live["T_cell"])
-PR      = float(result_live["PR"])
-eta     = float(result_live["eta"])
-eta_inv = float(result_live["eta_inv"])
+P_ac    = float(result_live["p_ac_kw"])           
+P_dc    = float(result_live["p_dc_kw"])           
+T_cell  = float(result_live["temp_cell"])         
+PR      = float(result_live["performance_ratio"]) 
+eta     = float(result_live["efficiency"])        
+eta_inv = float(result_live["inverter_eta"])      
 
 df_day = model.compute_series(seed=int(datetime.now().strftime("%Y%m%d")))
 energy_day_kWh   = daily_energy(df_day)
